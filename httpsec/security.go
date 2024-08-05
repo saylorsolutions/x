@@ -1,4 +1,4 @@
-package httpx
+package httpsec
 
 import (
 	"fmt"

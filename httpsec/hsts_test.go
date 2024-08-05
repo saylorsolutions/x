@@ -1,4 +1,4 @@
-package httpx
+package httpsec
 
 import (
 	"github.com/stretchr/testify/assert"
