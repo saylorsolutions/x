@@ -113,7 +113,7 @@ func EnableCORS(options ...CORSOption) SecurityOption {
 }
 
 // FallbackPolicy specifies the CORS allowances when no endpoint policy is found.
-// If this is not specified, then the default will be to not allow resource sharing.
+// If this is not specified, then the default will be to not allow cross-origin resource sharing.
 func FallbackPolicy(policy *CORSPolicy) CORSOption {
 	return func(c *corsConfig) {
 		if err := policy.validatePolicy(); err != nil {
@@ -125,6 +125,7 @@ func FallbackPolicy(policy *CORSPolicy) CORSOption {
 }
 
 // EndpointPolicy specifies the CORS allowances for the given endpoint.
+// This will use an exact-match criteria to determine if the policy applies to the given request.
 func EndpointPolicy(endpoint string, policy *CORSPolicy) CORSOption {
 	return func(c *corsConfig) {
 		if len(endpoint) == 0 {
@@ -138,6 +139,8 @@ func EndpointPolicy(endpoint string, policy *CORSPolicy) CORSOption {
 	}
 }
 
+// EndpointPrefixPolicy specifies the CORS allowances for endpoints with the given path prefix.
+// This will use a starts-with criteria to determine if the policy applies to the given request.
 func EndpointPrefixPolicy(prefix string, policy *CORSPolicy) CORSOption {
 	return func(c *corsConfig) {
 		if len(prefix) == 0 {
