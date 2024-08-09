@@ -11,7 +11,6 @@ const (
 )
 
 type SecurityPolicies struct {
-	csp                cspConfig
 	mw                 []func(next http.Handler) http.Handler
 	reportingEndpoints map[string]string
 	headers            http.Header
@@ -58,7 +57,6 @@ func (s *SecurityPolicies) Middleware(next http.Handler) http.Handler {
 		reportingEndpoints = strings.Join(each, ", ")
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		next.ServeHTTP(w, r)
 		if len(reportingEndpoints) > 0 {
 			w.Header().Add(HeaderReportingEndpoints, reportingEndpoints)
 		}
@@ -67,5 +65,6 @@ func (s *SecurityPolicies) Middleware(next http.Handler) http.Handler {
 				w.Header().Add(header, val)
 			}
 		}
+		next.ServeHTTP(w, r)
 	})
 }

@@ -67,6 +67,10 @@ type CSPOption func(c *cspConfig)
 
 // EnableContentSecurityPolicy allows specifying content security policies that will be applied in the [SecurityPolicies] middleware.
 //
+// CSP policies inform the browser about what content sources should be trusted for what content class.
+// The security of a CSP relies entirely upon the correct enforcement by the browser, so additional mechanisms and policies should be used (defense in depth).
+// This helps prevent the "easy" methods of loading untrusted content into a page, it's not foolproof.
+//
 // Source: https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP
 func EnableContentSecurityPolicy(opts ...CSPOption) SecurityOption {
 	conf := new(cspConfig)
