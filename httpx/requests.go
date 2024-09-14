@@ -138,6 +138,20 @@ func (r *Request) JSONBody(body any) *Request {
 	return r
 }
 
+func (r *Request) StdRequest() (*http.Request, error) {
+	r.mux.RLock()
+	defer r.mux.RUnlock()
+	if r.err != nil {
+		return nil, r.err
+	}
+	req, err := http.NewRequest(r.method, r.u.String(), r.body)
+	if err != nil {
+		return nil, err
+	}
+	req.Header = r.headers
+	return req, nil
+}
+
 func (r *Request) BasicAuth(user, pass string) *Request {
 	authStr := base64.URLEncoding.EncodeToString([]byte(user + ":" + pass))
 	r.SetHeader("Authorization", "Basic "+authStr)

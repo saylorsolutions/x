@@ -21,16 +21,7 @@ type Response struct {
 }
 
 func (r *Request) Send() (*Response, int, error) {
-	r.mux.RLock()
-	defer r.mux.RUnlock()
-	if r.err != nil {
-		return nil, 0, r.err
-	}
-	req, err := http.NewRequest(r.method, r.u.String(), r.body)
-	if err != nil {
-		return nil, 0, err
-	}
-	req.Header = r.headers
+	req, err := r.StdRequest()
 	_resp := &Response{
 		req: req,
 	}
@@ -88,6 +79,15 @@ func (r *Response) String() (string, error) {
 		return "", err
 	}
 	return buf.String(), nil
+}
+
+func (r *Response) GetHeader(header string) (string, bool) {
+	val := r.resp.Header.Get(header)
+	return val, len(val) > 0
+}
+
+func (r *Response) StdResponse() *http.Response {
+	return r.resp
 }
 
 func ReadJSON[T any](r *Response) (*T, error) {
