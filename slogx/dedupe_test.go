@@ -21,6 +21,7 @@ func TestDedupeHandler_WithAttrs(t *testing.T) {
 	handler := log.Handler().(*DedupeHandler)
 	assert.Equal(t, 1, strings.Count(buf.String(), "testkey"))
 	assert.Len(t, handler.attrs, 1)
+	assert.Equal(t, int64(4), handler.attrs[0].Value.Int64())
 	assert.Len(t, handler.attrSet, 1)
 }
 

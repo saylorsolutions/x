@@ -68,9 +68,9 @@ func (s *DedupeHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 		newKey := prefix + attr.Key
 		if cp.attrSet[newKey] {
 			for i := 0; i < len(cp.attrs); i++ {
-				existing := cp.attrs[i]
-				if existing.Key == newKey {
-					existing.Value = attr.Value
+				if cp.attrs[i].Key == newKey {
+					attr.Key = newKey
+					cp.attrs[i] = attr
 					break
 				}
 			}
