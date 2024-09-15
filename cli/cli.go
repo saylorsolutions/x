@@ -41,6 +41,7 @@ func newCommand(key, parent, shortUsage string, printer *Printer) *Command {
 	key = cleanseKey(key)
 	fs := flag.NewFlagSet(key, flag.ContinueOnError)
 	fs.BoolP("help", "h", false, "Prints this usage information")
+	fs.SetInterspersed(false)
 	cmd := &Command{flags: fs, key: key, parent: parent, shortUsage: shortUsage, printer: printer}
 	if len(parent) > 0 {
 		cmd.CommandSet.parent = strings.Join([]string{parent, key}, " ")
@@ -86,6 +87,13 @@ func (c *Command) Flags() *flag.FlagSet {
 // The short description, flag usages, and sub-command usages will be appended to this description.
 func (c *Command) Usage(format string, args ...any) *Command {
 	text := fmt.Sprintf(format, args...)
+	if len(c.Parent()) > 0 && len(text) > 0 {
+		text = c.Parent() + " " + text
+	}
+	if len(text) > 0 {
+		text = `USAGE:
+` + text
+	}
 	c.flags.Usage = func() {
 		var buf strings.Builder
 		if len(text) == 0 {
@@ -139,6 +147,7 @@ type CommandSet struct {
 	parent   string
 }
 
+// NewCommandSet is used to set up a top level [CommandSet] as the root of a CLI's command structure.
 func NewCommandSet(parent ...string) *CommandSet {
 	var _parent string
 	if len(parent) > 0 {

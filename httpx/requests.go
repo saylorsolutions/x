@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -19,6 +20,7 @@ type Request struct {
 	u       *url.URL
 	body    io.Reader
 	headers http.Header
+	ctx     context.Context
 	client  *http.Client
 }
 
@@ -34,16 +36,18 @@ func requestInit(u string) *Request {
 	}
 }
 
-func GetRequest(u string) *Request {
-	r := requestInit(u)
-	r.method = http.MethodGet
+func NewRequest(method, url string) *Request {
+	r := requestInit(url)
+	r.method = method
 	return r
 }
 
+func GetRequest(u string) *Request {
+	return NewRequest(http.MethodGet, u)
+}
+
 func PostRequest(u string) *Request {
-	r := requestInit(u)
-	r.method = http.MethodPost
-	return r
+	return NewRequest(http.MethodPost, u)
 }
 
 func PostFormRequest(u string, form url.Values) *Request {
@@ -58,21 +62,15 @@ func PostFormRequest(u string, form url.Values) *Request {
 }
 
 func PutRequest(u string) *Request {
-	r := requestInit(u)
-	r.method = http.MethodPut
-	return r
+	return NewRequest(http.MethodPut, u)
 }
 
 func PatchRequest(u string) *Request {
-	r := requestInit(u)
-	r.method = http.MethodPatch
-	return r
+	return NewRequest(http.MethodPatch, u)
 }
 
 func DeleteRequest(u string) *Request {
-	r := requestInit(u)
-	r.method = http.MethodDelete
-	return r
+	return NewRequest(http.MethodDelete, u)
 }
 
 func (r *Request) SetHeader(header, value string) *Request {
@@ -82,9 +80,22 @@ func (r *Request) SetHeader(header, value string) *Request {
 	return r
 }
 
+func (r *Request) WithContext(ctx context.Context) *Request {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	if r.err != nil {
+		return r
+	}
+	r.ctx = ctx
+	return r
+}
+
 func (r *Request) AddHeader(header, value string) *Request {
 	r.mux.Lock()
 	defer r.mux.Unlock()
+	if r.err != nil {
+		return r
+	}
 	r.headers.Add(header, value)
 	return r
 }
@@ -92,6 +103,9 @@ func (r *Request) AddHeader(header, value string) *Request {
 func (r *Request) SetQueryParams(param, value string) *Request {
 	r.mux.Lock()
 	defer r.mux.Unlock()
+	if r.err != nil {
+		return r
+	}
 	q := r.u.Query()
 	q.Set(param, value)
 	r.u.RawQuery = q.Encode()
@@ -101,6 +115,9 @@ func (r *Request) SetQueryParams(param, value string) *Request {
 func (r *Request) AddQueryParams(param, value string) *Request {
 	r.mux.Lock()
 	defer r.mux.Unlock()
+	if r.err != nil {
+		return r
+	}
 	r.u.Query().Add(param, value)
 	return r
 }
@@ -144,7 +161,11 @@ func (r *Request) StdRequest() (*http.Request, error) {
 	if r.err != nil {
 		return nil, r.err
 	}
-	req, err := http.NewRequest(r.method, r.u.String(), r.body)
+	ctx := r.ctx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	req, err := http.NewRequestWithContext(ctx, r.method, r.u.String(), r.body)
 	if err != nil {
 		return nil, err
 	}

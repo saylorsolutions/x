@@ -10,6 +10,11 @@ import (
 	"time"
 )
 
+const (
+	UseCommand  = "$use"  // This is used in interactive mode to indicate that a set of sub-commands should be pushed to the invocation stack.
+	BackCommand = "$back" // This is used in interactive mode to indicate that the last element on the invocation stack should be popped.
+)
+
 var (
 	InteractiveFlag         = "-i"                  // InteractiveFlag specifies the flag that the user should pass to trigger [CommandSet.RespondInteractive].
 	InteractiveQuitCommands = []string{"quit", "x"} // InteractiveQuitCommands is a slice of strings that should escape from interactive mode.
@@ -36,19 +41,55 @@ func (s *CommandSet) RespondInteractive() bool {
 }
 
 func (s *CommandSet) interactiveLoop(command string) error {
+	var (
+		commandStack [][]string
+	)
+	prefixCommands := func() []string {
+		if len(commandStack) == 0 {
+			return nil
+		}
+		return commandStack[len(commandStack)-1]
+	}
 	scanner := bufio.NewScanner(os.Stdin)
 	p := s.printer
-	p.Printf("Running '%s' interactively. Enter %s to exit.\n", command, strings.Join(InteractiveQuitCommands, " or "))
+	p.Printf(`Running '%s' interactively. Enter %s to exit.
+Use the %s command with one or more sub-commands to push them to the execution stack, and %s to pop and return.
+`, command, strings.Join(InteractiveQuitCommands, " or "),
+		UseCommand, BackCommand)
 	for {
-		p.Printf("%s> ", s.parent)
+		if len(commandStack) > 0 {
+			p.Printf("%s %s> ", s.parent, strings.Join(prefixCommands(), " "))
+		} else {
+			p.Printf("%s> ", s.parent)
+		}
 		switch {
 		case scanner.Scan():
 			line := strings.TrimSpace(scanner.Text())
 			if len(line) == 0 {
 				continue
 			}
-			if slices.Contains(InteractiveQuitCommands, strings.TrimSpace(strings.ToLower(line))) {
+			if slices.Contains(InteractiveQuitCommands, strings.ToLower(line)) {
 				return nil
+			}
+			if strings.HasPrefix(line, UseCommand) {
+				newStack := append(prefixCommands(), translate(strings.Split(line, " "), func(e string) (string, bool) {
+					val := strings.TrimSpace(e)
+					if len(val) == 0 {
+						return "", false
+					}
+					return val, true
+				})[1:]...)
+				p.Printf("Using '%s'\n", strings.Join(newStack, " "))
+				commandStack = append(commandStack, newStack)
+				continue
+			}
+			if strings.HasPrefix(line, BackCommand) {
+				if len(commandStack) == 0 {
+					p.Println("Already at root command")
+					continue
+				}
+				commandStack = commandStack[:len(commandStack)-1]
+				continue
 			}
 			segments := translate(strings.Split(line, " "), func(element string) (string, bool) {
 				val := strings.TrimSpace(element)
@@ -57,6 +98,7 @@ func (s *CommandSet) interactiveLoop(command string) error {
 				}
 				return val, true
 			})
+			segments = append(prefixCommands(), segments...)
 			if len(segments) > 0 && segments[0] == InteractiveFlag {
 				p.Println("Cannot run interactively twice")
 				continue
