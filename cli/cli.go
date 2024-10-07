@@ -136,6 +136,9 @@ func (c *Command) Exec(args []string) error {
 		c.flags.Usage()
 		return nil
 	}
+	if err := runGlobalPreExec(); err != nil {
+		return err
+	}
 	return c.exec(c.flags, c.Printer())
 }
 
@@ -148,6 +151,9 @@ type CommandSet struct {
 }
 
 // NewCommandSet is used to set up a top level [CommandSet] as the root of a CLI's command structure.
+//
+// Note: the parent(s) passed to this function will be used to populate sub-command usage information.
+// So they should only contain the commands used to invoke this [CommandSet].
 func NewCommandSet(parent ...string) *CommandSet {
 	var _parent string
 	if len(parent) > 0 {

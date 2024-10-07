@@ -46,6 +46,7 @@ func ExampleNewCommandSet() {
 	//
 	// Shows an example of a sub-command
 	//
+	// USAGE:
 	// my-cli sub-command [FLAGS]
 	//
 	// FLAGS
