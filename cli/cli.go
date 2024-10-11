@@ -87,7 +87,10 @@ func (c *Command) Flags() *flag.FlagSet {
 // The short description, flag usages, and sub-command usages will be appended to this description.
 func (c *Command) Usage(format string, args ...any) *Command {
 	text := fmt.Sprintf(format, args...)
-	if len(c.Parent()) > 0 && len(text) > 0 {
+	if len(text) == 0 {
+		text = c.key
+	}
+	if len(c.Parent()) > 0 {
 		text = c.Parent() + " " + text
 	}
 	if len(text) > 0 {
@@ -112,7 +115,7 @@ func (c *Command) Usage(format string, args ...any) *Command {
 			buf.WriteString("\nCOMMANDS\n")
 			buf.WriteString(c.CommandUsages())
 		}
-		fmt.Print(buf.String())
+		c.Printer().Print(buf.String())
 	}
 	return c
 }
@@ -139,7 +142,20 @@ func (c *Command) Exec(args []string) error {
 	if err := runGlobalPreExec(); err != nil {
 		return err
 	}
-	return c.exec(c.flags, c.Printer())
+	out := c.Printer()
+	err := c.exec(c.flags, out)
+	if err != nil {
+		if errors.Is(err, &UsageError{}) {
+			out.Println(err.Error())
+			out.Println()
+			if c.flags.Usage == nil {
+				c.Usage("")
+			}
+			c.flags.Usage()
+		}
+		return err
+	}
+	return nil
 }
 
 // CommandSet is a group of [Command].

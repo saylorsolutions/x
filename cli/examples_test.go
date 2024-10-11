@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	flag "github.com/spf13/pflag"
+	"os"
 )
 
 func ExampleNewCommandSet() {
@@ -20,6 +21,8 @@ func ExampleNewCommandSet() {
 	// Parent command references will automatically be prepended to this string.
 	// In this case the actual usage string will be 'my-cli sub-command [FLAGS]'.
 	sub.Usage("sub-command [FLAGS]")
+	// Done for the example test.
+	sub.Printer().Redirect(os.Stdout)
 
 	// Functionality is defined with the Does method.
 	sub.Does(func(flags *flag.FlagSet, _ *Printer) error {

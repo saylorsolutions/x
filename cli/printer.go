@@ -9,7 +9,7 @@ import (
 // Printer is provided to easily establish policies for user messages.
 // It exposes Print, Println, and Printf methods.
 //
-// Printer writes to [os.Stderr] by default, but his can be overridden with [Printer.Redirect].
+// Printer writes to [os.Stderr] by default, but this can be overridden with [Printer.Redirect].
 type Printer struct {
 	out io.Writer
 }
