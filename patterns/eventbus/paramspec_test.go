@@ -21,7 +21,7 @@ func TestParamSpec(t *testing.T) {
 		opt int
 	)
 
-	spec := ParamSpec(
+	spec := ParamSpec(4,
 		AssertAndStore(&a),
 		nil,
 		AssertAndStore(&b),

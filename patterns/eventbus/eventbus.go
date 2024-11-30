@@ -4,9 +4,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/saylorsolutions/x/structures/set"
 	"github.com/saylorsolutions/x/syncx"
 	"sync"
 	"time"
+)
+
+var (
+	ErrNoHandler    = errors.New("no handler found")
+	ErrInvalidEvent = errors.New("event ID 0 cannot be dispatched")
 )
 
 // Event is a unique ID for an event in a domain.
@@ -22,9 +28,10 @@ const (
 )
 
 var (
-	// DispatchBuffer dictates the size of the dispatch channel.
+	// DefaultBufferSize dictates the size of the dispatch channel.
 	// May be increased to optimize for higher throughput and less blocking at the expense of more reserved memory.
-	DispatchBuffer = 1
+	// The number of event processing goroutines will be set to match DefaultBufferSize.
+	DefaultBufferSize = 1
 )
 
 var (
@@ -42,11 +49,21 @@ func Instance() *EventBus {
 	return instanceBus
 }
 
-func NewEventBus() *EventBus {
+// NewEventBus will create a new [EventBus] with default settings.
+// A bufferSize may be specified to override the value of [DefaultBufferSize].
+func NewEventBus(bufferSize ...int) *EventBus {
+	dispBuf := DefaultBufferSize
+	if len(bufferSize) > 0 {
+		dispBuf = bufferSize[0]
+	}
+	if dispBuf < 1 {
+		panic("buffer size must be >= 1")
+	}
 	return &EventBus{
-		handlers:  map[HandlerID]EventHandler{},
-		eventMask: map[HandlerID]map[Event]bool{},
-		events:    make(chan *busDispatch, DispatchBuffer),
+		handlers:      map[HandlerID]Handler{},
+		handledEvents: map[Event]set.Set[HandlerID]{},
+		events:        make(chan *busDispatch, DefaultBufferSize),
+		eventsSize:    dispBuf,
 	}
 }
 
@@ -58,24 +75,26 @@ func Paramf(format string, args ...any) Param {
 
 type HandlerID string
 
-type EventHandler interface {
+// Handler describes a component of the program that handles events received from the [EventBus].
+// Handlers should return quickly to prevent blocking other events, and may spin up additional goroutines to support this.
+type Handler interface {
 	// HandleEvent will handle the given event and do some kind of processing.
 	// Returned errors will be reported with a dispatched [EventAsyncError].
 	HandleEvent(evt Event, params ...Param) error
-	// Stop will alert the [EventHandler] that it should clean up resources and reject further events.
+	// Stop will alert the [Handler] that it should clean up resources and reject further events.
 	// This can be ignored if not needed.
 	Stop()
 }
 
-// EventHandlerFunc is a function that implements the EventHandler interface.
-// This is intended for simple event handling cases where [EventHandler.Stop] has no real semantics for the handling component.
-type EventHandlerFunc func(evt Event, params ...Param) error
+// HandlerFunc is a function that implements the Handler interface.
+// This is intended for simple event handling cases where [Handler.Stop] has no real semantics for the handling component.
+type HandlerFunc func(evt Event, params ...Param) error
 
-func (f EventHandlerFunc) HandleEvent(evt Event, params ...Param) error {
+func (f HandlerFunc) HandleEvent(evt Event, params ...Param) error {
 	return f(evt, params...)
 }
 
-func (f EventHandlerFunc) Stop() {}
+func (f HandlerFunc) Stop() {}
 
 type busDispatch struct {
 	event  Event
@@ -84,14 +103,15 @@ type busDispatch struct {
 }
 
 type EventBus struct {
-	events          chan *busDispatch
 	dispatchLoop    sync.Once
 	stopDispatch    sync.Once
 	doneDispatching sync.WaitGroup
+	eventsSize      int
 
-	mux       sync.RWMutex
-	handlers  map[HandlerID]EventHandler
-	eventMask map[HandlerID]map[Event]bool
+	mux           sync.RWMutex
+	events        chan *busDispatch
+	handlers      map[HandlerID]Handler
+	handledEvents map[Event]set.Set[HandlerID]
 }
 
 // Dispatch will submit an event to the [EventBus] for propagation.
@@ -99,7 +119,7 @@ type EventBus struct {
 // If the EventBus is stopping, then this call will block indefinitely.
 func (b *EventBus) Dispatch(evt Event, params ...Param) {
 	if evt == EventNone {
-		b.DispatchError("attempted call to Dispatch with missing Event code: %#v", params)
+		b.DispatchError(ErrInvalidEvent)
 		return
 	}
 	dispatch := &busDispatch{
@@ -114,8 +134,8 @@ func (b *EventBus) Dispatch(evt Event, params ...Param) {
 // If an error is returned, then an [EventAsyncError] is still propagated to an appropriate handler, if registered.
 func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error] {
 	if evt == EventNone {
-		b.DispatchError("attempted call to Dispatch with missing Event code: %#v", params)
-		return syncx.StaticFuture(fmt.Errorf("attempted call to Dispatch with missing Event code: %#v", params))
+		b.DispatchError(ErrInvalidEvent)
+		return syncx.StaticFuture(ErrInvalidEvent)
 	}
 	dispatch := &busDispatch{
 		event:  evt,
@@ -126,38 +146,33 @@ func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error
 	return dispatch.future
 }
 
-func (b *EventBus) DispatchError(format string, args ...any) {
-	err := fmt.Sprintf(format, args...)
+func (b *EventBus) DispatchErrorf(format string, args ...any) {
+	b.DispatchError(fmt.Errorf(format, args...))
+}
+
+func (b *EventBus) DispatchError(err error) {
 	b.Dispatch(EventAsyncError, err)
 }
 
-func (b *EventBus) Register(id HandlerID, handler EventHandler, handledEvents ...Event) {
+func (b *EventBus) Register(id HandlerID, handler Handler, handledEvents ...Event) {
 	syncx.LockFunc(&b.mux, func() {
 		b.handlers[id] = handler
-		b.eventMask[id] = map[Event]bool{}
 		for _, evt := range handledEvents {
-			b.eventMask[id][evt] = true
+			b.handledEvents[evt] = b.handledEvents[evt].Add(id)
 		}
 	})
 }
 
 func (b *EventBus) RegisterErrorHandler(id HandlerID, handler func(error)) {
-	b.Register(id, EventHandlerFunc(func(evt Event, params ...Param) error {
+	b.Register(id, HandlerFunc(func(evt Event, params ...Param) error {
 		var (
-			err  error
-			serr string
+			err error
 		)
 		spec := ParamSpec(1,
-			AnyPass(
-				AssertAndStore(&err),
-				AssertAndStore(&serr),
-			),
+			AssertAndStore(&err),
 		)
 		if errs := spec(params); len(errs) > 0 {
-			return fmt.Errorf("expected a single error/string parameter: %w", err)
-		}
-		if len(serr) > 0 {
-			err = errors.New(serr)
+			return fmt.Errorf("expected a single error parameter: %w", err)
 		}
 		handler(err)
 		return nil
@@ -177,42 +192,33 @@ func (b *EventBus) UnRegister(id HandlerID) {
 
 func (b *EventBus) AddHandledEvent(id HandlerID, evt Event) error {
 	return syncx.LockFuncT(&b.mux, func() error {
-		events, ok := b.eventMask[id]
+		_, ok := b.handlers[id]
 		if !ok {
 			return fmt.Errorf("no registered handler with id '%s'", id)
 		}
-		events[evt] = true
+		b.handledEvents[evt] = b.handledEvents[evt].Add(id)
 		return nil
 	})
 }
 
 func (b *EventBus) AddHandledExclusive(id HandlerID, evt Event) error {
 	return syncx.LockFuncT(&b.mux, func() error {
-		events, ok := b.eventMask[id]
+		_, ok := b.handlers[id]
 		if !ok {
 			return fmt.Errorf("no registered handler with id '%s'", id)
 		}
-		for curID, handledEvents := range b.eventMask {
-			if curID == id {
-				continue
-			}
-			if handledEvents == nil {
-				continue
-			}
-			delete(handledEvents, evt)
-		}
-		events[evt] = true
+		b.handledEvents[evt] = set.New(id)
 		return nil
 	})
 }
 
 func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 	return syncx.LockFuncT(&b.mux, func() error {
-		events, ok := b.eventMask[id]
+		_, ok := b.handlers[id]
 		if !ok {
 			return fmt.Errorf("no registered handler with id '%s'", id)
 		}
-		delete(events, evt)
+		b.handledEvents[evt] = b.handledEvents[evt].Remove(id)
 		return nil
 	})
 }
@@ -220,69 +226,70 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 // Start will start processing of dispatched events if it's not started already.
 // Once the [EventBus] has stopped processing events, it cannot be restarted.
 // This is safe to call multiple times from multiple goroutines. Only the first call to start will begin processing.
-func (b *EventBus) Start(ctx context.Context) {
+func (b *EventBus) Start(ctx context.Context) *EventBus {
 	b.dispatchLoop.Do(func() {
-		b.doneDispatching.Add(1)
-		go func() {
-			defer b.doneDispatching.Done()
-			defer func() {
-				for _, handler := range b.handlers {
-					handler.Stop()
-				}
-			}()
-			for {
-				select {
-				case <-ctx.Done():
-					b.Stop()
-					return
-				case dispatch, more := <-b.events:
-					if !more {
-						return
-					}
-					syncx.RLockFunc(&b.mux, func() {
-						defer func() {
-							// If a result has already been returned or a result is not requested, then this does nothing
-							dispatch.future.Resolve(nil)
-						}()
-
-						// Locate relevant handlers
-						handlers := map[HandlerID]struct{}{}
-						for id, handles := range b.eventMask {
-							if handles == nil {
-								continue
-							}
-							if handles[dispatch.event] {
-								handlers[id] = struct{}{}
-							}
-						}
-						noHandlersMessage := fmt.Sprintf("No handlers for event %d", dispatch.event)
-						if len(handlers) == 0 {
-							// None found
-							if dispatch.event != EventAsyncError {
-								dispatch.future.Resolve(errors.New(noHandlersMessage))
-								b.DispatchError(noHandlersMessage)
-							}
-							return
-						}
-
-						// Dispatch to all relevant handlers
-						for id := range handlers {
-							handler := b.handlers[id]
-							if handler == nil {
-								continue
-							}
-							err := handler.HandleEvent(dispatch.event, dispatch.params...)
-							if err != nil {
-								// Return first error
-								dispatch.future.Resolve(err)
-								b.DispatchError("Handler '%s' failed to handle event %d: %v", id, dispatch.event, err)
-							}
-						}
-					})
-				}
-			}
-		}()
+		b.doneDispatching.Add(b.eventsSize)
+		// Must cache events channel so a goroutine doesn't block after a call to Stop.
+		events := b.events
+		for i := 0; i < b.eventsSize; i++ {
+			go b.start(ctx, events)
+		}
 	})
+	return b
+}
+
+func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
+	defer b.doneDispatching.Done()
+	defer func() {
+		for _, handler := range b.handlers {
+			handler.Stop()
+		}
+	}()
+	for {
+		select {
+		case <-ctx.Done():
+			b.Stop()
+			return
+		case dispatch, more := <-events:
+			if !more {
+				return
+			}
+			syncx.RLockFunc(&b.mux, func() {
+				defer func() {
+					// If a result has already been returned or a result is not requested, then this does nothing
+					dispatch.future.Resolve(nil)
+				}()
+
+				// Locate relevant handlers
+				handlers := b.handledEvents[dispatch.event]
+				noHandlersMessage := fmt.Errorf("%w for event %d", ErrNoHandler, dispatch.event)
+
+				// None found
+				if len(handlers) == 0 {
+					// Check if this is already an EventAsyncError
+					if dispatch.event != EventAsyncError {
+						dispatch.future.Resolve(noHandlersMessage)
+						b.DispatchError(noHandlersMessage)
+					}
+					return
+				}
+
+				// Dispatch to all relevant handlers
+				for id := range handlers {
+					handler := b.handlers[id]
+					if handler == nil {
+						continue
+					}
+					err := handler.HandleEvent(dispatch.event, dispatch.params...)
+					if err != nil {
+						// Return first error
+						dispatch.future.Resolve(err)
+						b.DispatchErrorf("Handler '%s' failed to handle event %d: %v", id, dispatch.event, err)
+					}
+				}
+			})
+		}
+	}
 }
 
 // Stop will stop the [EventBus] and immediately return without waiting for processing to complete in the background.

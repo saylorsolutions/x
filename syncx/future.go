@@ -29,12 +29,12 @@ func NewFuture[T any]() Future[T] {
 // SymbolicFuture returns a [Future] that does nothing.
 // It's used to satisfy an interface constraint when no actual result will be returned, and conserves resource.
 func SymbolicFuture[T any]() Future[T] {
-	return &noOpFuture[T]{}
+	return &staticFuture[T]{}
 }
 
 // StaticFuture returns the given value in response to [Future.Await], and [Future.Resolve] has no effect.
 func StaticFuture[T any](val T) Future[T] {
-	return &noOpFuture[T]{
+	return &staticFuture[T]{
 		staticVal: val,
 	}
 }
@@ -60,12 +60,12 @@ func NewFutureErr[T any]() FutureErr[T] {
 
 // SymbolicFutureErr returns a [FutureErr] that does nothing. It's used to satisfy an interface constraint when no actual result will be returned, and conserves resource.
 func SymbolicFutureErr[T any]() FutureErr[T] {
-	return &noOpFuture[T]{}
+	return &staticFuture[T]{}
 }
 
 // StaticFutureErr returns the given value in response to [FutureErr.AwaitErr], and [FutureErr.ResolveErr] has no effect.
 func StaticFutureErr[T any](val T, err error) FutureErr[T] {
-	return &noOpFuture[T]{
+	return &staticFuture[T]{
 		staticVal: val,
 		err:       err,
 	}
@@ -129,21 +129,21 @@ func (f *future[T]) await(ctx context.Context) (T, error) {
 	}
 }
 
-type noOpFuture[T any] struct {
+type staticFuture[T any] struct {
 	staticVal T
 	err       error
 }
 
-func (n *noOpFuture[T]) Resolve(T) {
+func (n *staticFuture[T]) Resolve(T) {
 }
 
-func (n *noOpFuture[T]) Await(...time.Duration) T {
+func (n *staticFuture[T]) Await(...time.Duration) T {
 	return n.staticVal
 }
 
-func (n *noOpFuture[T]) ResolveErr(T, error) {
+func (n *staticFuture[T]) ResolveErr(T, error) {
 }
 
-func (n *noOpFuture[T]) AwaitErr(...time.Duration) (T, error) {
+func (n *staticFuture[T]) AwaitErr(...time.Duration) (T, error) {
 	return n.staticVal, n.err
 }
