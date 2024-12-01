@@ -154,17 +154,15 @@ func (b *EventBus) DispatchError(err error) {
 	b.Dispatch(EventAsyncError, err)
 }
 
-func (b *EventBus) Register(id HandlerID, handler Handler, handledEvents ...Event) {
+func (b *EventBus) Register(id HandlerID, handledEvent Event, handler Handler) {
 	syncx.LockFunc(&b.mux, func() {
 		b.handlers[id] = handler
-		for _, evt := range handledEvents {
-			b.handledEvents[evt] = b.handledEvents[evt].Add(id)
-		}
+		b.handledEvents[handledEvent] = b.handledEvents[handledEvent].Add(id)
 	})
 }
 
 func (b *EventBus) RegisterErrorHandler(id HandlerID, handler func(error)) {
-	b.Register(id, HandlerFunc(func(evt Event, params ...Param) error {
+	b.Register(id, EventAsyncError, HandlerFunc(func(evt Event, params ...Param) error {
 		var (
 			err error
 		)
@@ -176,7 +174,7 @@ func (b *EventBus) RegisterErrorHandler(id HandlerID, handler func(error)) {
 		}
 		handler(err)
 		return nil
-	}), EventAsyncError)
+	}))
 }
 
 func (b *EventBus) UnRegister(id HandlerID) {
@@ -245,7 +243,29 @@ func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
 			handler.Stop()
 		}
 	}()
+	var errs []error
 	for {
+		if len(errs) > 0 {
+			// Dispatch errors
+			syncx.RLockFunc(&b.mux, func() {
+				errHandlerIDs := b.handledEvents[EventAsyncError]
+				if len(errHandlerIDs) == 0 {
+					// No registered error handlers, nothing to do.
+					return
+				}
+				for _, err := range errs {
+					for id := range errHandlerIDs {
+						handler := b.handlers[id]
+						if handler == nil {
+							continue
+						}
+						// No recourse for error handler returning an error in this context.
+						_ = handler.HandleEvent(EventAsyncError, err)
+					}
+				}
+			})
+			errs = nil
+		}
 		select {
 		case <-ctx.Done():
 			b.Stop()
@@ -269,7 +289,7 @@ func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
 					// Check if this is already an EventAsyncError
 					if dispatch.event != EventAsyncError {
 						dispatch.future.Resolve(noHandlersMessage)
-						b.DispatchError(noHandlersMessage)
+						errs = append(errs, noHandlersMessage)
 					}
 					return
 				}
@@ -284,7 +304,7 @@ func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
 					if err != nil {
 						// Return first error
 						dispatch.future.Resolve(err)
-						b.DispatchErrorf("Handler '%s' failed to handle event %d: %v", id, dispatch.event, err)
+						errs = append(errs, fmt.Errorf("handler '%s' failed to handle event %d: %v", id, dispatch.event, err))
 					}
 				}
 			})

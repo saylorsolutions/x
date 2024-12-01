@@ -75,10 +75,10 @@ func TestEventBus_Dispatch_Async(t *testing.T) {
 	)
 
 	bus := testEventBus(nil, nil)
-	bus.Register("counter", HandlerFunc(func(evt Event, params ...Param) error {
+	bus.Register("counter", testEvent, HandlerFunc(func(evt Event, params ...Param) error {
 		counter.Add(1)
 		return nil
-	}), testEvent)
+	}))
 	assert.NoError(t, bus.AddHandledExclusive("counter", testEvent))
 	bus.RegisterErrorHandler("err-handler", func(err error) {
 		asyncErrs.Add(1)
@@ -112,9 +112,44 @@ func TestDispatchBuffer_Invalid(t *testing.T) {
 	buf.AwaitStop(testShutdownTimeout)
 }
 
+func TestEventBus_Stop(t *testing.T) {
+	bus := NewEventBus()
+	handler := new(testHandlerImpl)
+	bus.Register("stopping-handler", testEvent, handler)
+	bus.Start(context.Background())
+
+	for i := 0; i < 3; i++ {
+		bus.Dispatch(testEvent, fmt.Sprintf("%d", i))
+	}
+	bus.AwaitStop(testShutdownTimeout)
+	assert.Equal(t, 3, handler.count)
+	assert.Equal(t, 1, handler.stoppedCount)
+	assert.True(t, handler.stopped)
+}
+
+var _ Handler = (*testHandlerImpl)(nil)
+
+// This isn't really representative of a good [Handler].
+// In reality, we should probably have some locking over these fields to prevent race conditions.
+type testHandlerImpl struct {
+	count        int
+	stoppedCount int
+	stopped      bool
+}
+
+func (t *testHandlerImpl) HandleEvent(evt Event, params ...Param) error {
+	t.count++
+	return nil
+}
+
+func (t *testHandlerImpl) Stop() {
+	t.stoppedCount++
+	t.stopped = true
+}
+
 func testEventBus(handlerCalled, errorReceived *bool) *EventBus {
 	bus := NewEventBus().Start(context.Background())
-	bus.Register("test-handler", HandlerFunc(func(evt Event, params ...Param) error {
+	bus.Register("test-handler", testEvent, HandlerFunc(func(evt Event, params ...Param) error {
 		if handlerCalled != nil {
 			*handlerCalled = true
 		}
@@ -126,7 +161,7 @@ func testEventBus(handlerCalled, errorReceived *bool) *EventBus {
 			return errors.Join(errs...)
 		}
 		return nil
-	}), testEvent)
+	}))
 	if errorReceived != nil {
 		bus.RegisterErrorHandler("error-handler", testShouldNotFail(errorReceived))
 	}
