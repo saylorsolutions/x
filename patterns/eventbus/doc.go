@@ -58,7 +58,7 @@ The first error that occurs will be returned via the [Future], and all errors wi
 
 To dispatch an error outside a [Handler], use either the [EventBus.DispatchError] or [EventBus.DispatchErrorf] methods.
 Note that using these methods in handlers can cause a deadlock when the processing goroutines are trying to process events while handlers are trying to dispatch errors.
-To errors in Handlers should just be returned from the processing method/function.
+To return an error from a Handlers, just return it from the processing method/function.
 
 [Future]: github.com/saylorsolutions/x/syncx/future.go
 */
