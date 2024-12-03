@@ -2,6 +2,7 @@ package httpsec
 
 import (
 	"fmt"
+	"github.com/saylorsolutions/x/httpx"
 	"net/http"
 	"strings"
 )
@@ -57,14 +58,16 @@ func (s *SecurityPolicies) Middleware(next http.Handler) http.Handler {
 		reportingEndpoints = strings.Join(each, ", ")
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		dw := httpx.NewDeferredWriter(w)
 		if len(reportingEndpoints) > 0 {
-			w.Header().Add(HeaderReportingEndpoints, reportingEndpoints)
+			dw.Header().Add(HeaderReportingEndpoints, reportingEndpoints)
 		}
 		for header, vals := range s.headers {
 			for _, val := range vals {
-				w.Header().Add(header, val)
+				dw.Header().Add(header, val)
 			}
 		}
-		next.ServeHTTP(w, r)
+		next.ServeHTTP(dw, r)
+		_ = dw.Commit()
 	})
 }
