@@ -161,6 +161,10 @@ func (b *EventBus) Register(id HandlerID, handledEvent Event, handler Handler) {
 	})
 }
 
+func (b *EventBus) RegisterFunc(id HandlerID, handledEvent Event, handler HandlerFunc) {
+	b.Register(id, handledEvent, handler)
+}
+
 func (b *EventBus) RegisterErrorHandler(id HandlerID, handler func(error)) {
 	b.Register(id, EventAsyncError, HandlerFunc(func(evt Event, params ...Param) error {
 		var (
@@ -199,7 +203,7 @@ func (b *EventBus) AddHandledEvent(id HandlerID, evt Event) error {
 	})
 }
 
-func (b *EventBus) AddHandledExclusive(id HandlerID, evt Event) error {
+func (b *EventBus) SetHandledExclusive(id HandlerID, evt Event) error {
 	return syncx.LockFuncT(&b.mux, func() error {
 		_, ok := b.handlers[id]
 		if !ok {

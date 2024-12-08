@@ -79,7 +79,7 @@ func TestEventBus_Dispatch_Async(t *testing.T) {
 		counter.Add(1)
 		return nil
 	}))
-	assert.NoError(t, bus.AddHandledExclusive("counter", testEvent))
+	assert.NoError(t, bus.SetHandledExclusive("counter", testEvent))
 	bus.RegisterErrorHandler("err-handler", func(err error) {
 		asyncErrs.Add(1)
 		t.Errorf("Should not have received an error: %v", err)
