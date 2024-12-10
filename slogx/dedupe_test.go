@@ -48,3 +48,21 @@ func TestDedupeHandler_NilImpl(t *testing.T) {
 		NewDedupeHandler(nil)
 	})
 }
+
+func TestDedupeHandler_Handle_DupeRecordAttrs(t *testing.T) {
+	var buf bytes.Buffer
+	log := slog.New(NewDedupeHandler(slog.NewTextHandler(&buf, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	})))
+	log = log.With("testkey", 1, "testkey", 2)
+	log.Info("Test message")
+	line := buf.String()
+	t.Log("First line:", line)
+	assert.Equal(t, 1, strings.Count(line, "testkey"))
+	buf.Reset()
+
+	log.Info("Test message", "testkey", 3)
+	line = buf.String()
+	t.Log("Second line:", line)
+	assert.Equal(t, 1, strings.Count(line, "testkey"))
+}

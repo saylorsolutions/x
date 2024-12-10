@@ -55,6 +55,18 @@ func (s *DedupeHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (s *DedupeHandler) Handle(ctx context.Context, record slog.Record) error {
+	var addtlAttrs []slog.Attr
+	if record.NumAttrs() > 0 {
+		addtlAttrs = make([]slog.Attr, record.NumAttrs())
+		i := 0
+		record.Attrs(func(attr slog.Attr) bool {
+			addtlAttrs[i] = attr
+			i++
+			return true
+		})
+		record = slog.NewRecord(record.Time, record.Level, record.Message, record.PC)
+		s = s.WithAttrs(addtlAttrs).(*DedupeHandler)
+	}
 	return s.impl.WithAttrs(s.attrs).Handle(ctx, record)
 }
 
