@@ -49,12 +49,14 @@ func (a ParamAssertion) And(other ParamAssertion, more ...ParamAssertion) ParamA
 
 // AnyPass will run a set of [ParamAssertion], and if any return a nil error, then execution will stop and return nil.
 // This only returns an error if all [ParamAssertion] fail, and all errors will be returned.
+// This is most useful if a [Param] can have one of multiple types.
 func AnyPass(assertions ...ParamAssertion) ParamAssertion {
 	return func(pos int, p Param) error {
 		var errs []error
 		for _, assertion := range assertions {
 			if err := assertion(pos, p); err != nil {
 				errs = append(errs, err)
+				continue
 			}
 			// This assertion passes, so we return nil.
 			return nil

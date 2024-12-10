@@ -35,3 +35,17 @@ func TestParamSpec(t *testing.T) {
 	assert.Equal(t, 3, c)
 	assert.Equal(t, 0, opt)
 }
+
+func TestAnyPass(t *testing.T) {
+	var (
+		a string
+		b int
+	)
+	err := AnyPass(
+		AssertAndStore(&b),
+		AssertAndStore(&a),
+	)(1, "A value")
+	assert.NoError(t, err)
+	assert.Equal(t, 0, b)
+	assert.Equal(t, "A value", a)
+}
