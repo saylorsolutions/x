@@ -138,3 +138,11 @@ func ParamSpec(minParams int, assertions ...ParamAssertion) func(params []Param)
 		return errs
 	}
 }
+
+// MapParam provides a simple interface for mapping a single parameter to a target variable, which is common for handlers.
+func MapParam[T any](target *T, params []Param) error {
+	errs := ParamSpec(1,
+		AssertAndStore(target),
+	)(params)
+	return errors.Join(errs...)
+}

@@ -147,3 +147,46 @@ func (n *staticFuture[T]) ResolveErr(T, error) {
 func (n *staticFuture[T]) AwaitErr(...time.Duration) (T, error) {
 	return n.staticVal, n.err
 }
+
+// FutureChannel will create a channel that receives the result of the given [Future].
+// A new goroutine is created to block on the Await call.
+func FutureChannel[T any](f Future[T]) <-chan T {
+	ch := make(chan T)
+	go func() {
+		defer close(ch)
+		ch <- f.Await()
+	}()
+	return ch
+}
+
+// ErrChannelResult is the type returned in a channel produced from [FutureErrChannel].
+type ErrChannelResult[T any] struct {
+	Result T
+	Err    error
+}
+
+// FutureErrChannel will create a channel that receives the [ErrChannelResult] of the given [FutureErr].
+// A new goroutine is created to block on the AwaitErr call.
+func FutureErrChannel[T any](f FutureErr[T]) <-chan ErrChannelResult[T] {
+	ch := make(chan ErrChannelResult[T])
+	go func() {
+		defer close(ch)
+		result, err := f.AwaitErr()
+		ch <- ErrChannelResult[T]{result, err}
+	}()
+	return ch
+}
+
+// DiscardFuture will start a new goroutine to call Await on the [Future] indefinitely, so the underlying channel is not leaked.
+func DiscardFuture[T any](f Future[T]) {
+	go func() {
+		f.Await()
+	}()
+}
+
+// DiscardFutureErr will start a new goroutine to call AwaitErr on the [FutureErr] indefinitely, so the underlying channel is not leaked.
+func DiscardFutureErr[T any](f FutureErr[T]) {
+	go func() {
+		_, _ = f.AwaitErr()
+	}()
+}
