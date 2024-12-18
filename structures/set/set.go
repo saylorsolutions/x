@@ -25,6 +25,19 @@ func FromKeys[T comparable, E any](vals map[T]E) Set[T] {
 	return s
 }
 
+func (s Set[T]) Slice() []T {
+	if len(s) == 0 {
+		return nil
+	}
+	vals := make([]T, len(s))
+	i := 0
+	for val := range s {
+		vals[i] = val
+		i++
+	}
+	return vals
+}
+
 func (s Set[T]) Add(val T, others ...T) Set[T] {
 	if s == nil {
 		s = Set[T]{}
