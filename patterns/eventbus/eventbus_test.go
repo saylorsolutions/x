@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -16,6 +17,38 @@ const (
 	testShutdownTimeout       = time.Second
 	testAwaitTimeout          = 100 * time.Millisecond
 )
+
+func TestInitInstance(t *testing.T) {
+	t.Cleanup(func() {
+		// Resetting in case I need to test global instance stuff more.
+		initOnce = sync.Once{}
+	})
+	result := InitInstance(BufferSize(2), NumWorkers(4))
+	assert.True(t, result, "Should have configured the global instance")
+	assert.Equal(t, 4, Instance().numWorkers)
+	result = InitInstance(BufferSize(1), NumWorkers(1))
+	assert.False(t, result, "Instance was already configured, shouldn't have happened again")
+}
+
+func TestBufferSize_InvalidInput(t *testing.T) {
+	conf := busConf{
+		bufferSize: DefaultBufferSize,
+		numWorkers: DefaultBufferSize,
+	}
+	assert.Error(t, BufferSize(0)(&conf))
+	assert.Error(t, BufferSize(-1)(&conf))
+	assert.Equal(t, DefaultBufferSize, conf.bufferSize)
+}
+
+func TestNumWorkers_InvalidInput(t *testing.T) {
+	conf := busConf{
+		bufferSize: DefaultBufferSize,
+		numWorkers: DefaultBufferSize,
+	}
+	assert.Error(t, NumWorkers(0)(&conf))
+	assert.Error(t, NumWorkers(-1)(&conf))
+	assert.Equal(t, DefaultBufferSize, conf.numWorkers)
+}
 
 func TestEventBus_Dispatch(t *testing.T) {
 	var (

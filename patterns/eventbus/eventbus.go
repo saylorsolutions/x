@@ -49,7 +49,7 @@ func InitInstance(confFunc ...ConfigFunc) bool {
 }
 
 // Instance is useful in cases where a single, global [EventBus] is desired.
-// This can be helpful for accessing and synchronizing events.
+// This can be helpful for accessing and synchronizing events while maintaining loose coupling.
 // The global visibility means it's likely not a good fit for concurrent configuration, since it introduces the potential for configuration race conditions.
 //
 // This function doesn't allow configuring the global instance beyond the defaults. Use [InitInstance] to do that.
