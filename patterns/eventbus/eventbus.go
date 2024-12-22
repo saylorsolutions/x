@@ -27,10 +27,8 @@ const (
 	EventAsyncError              // EventAsyncError is a reserved event used for transmitting processing errors.
 )
 
-var (
-	// DefaultBufferSize dictates the size of the dispatch channel.
-	// May be increased to optimize for higher throughput and less blocking at the expense of more reserved memory.
-	// The number of event processing goroutines will be set to match DefaultBufferSize.
+const (
+	// DefaultBufferSize dictates the default size of the dispatch channel, and the default number of handler workers.
 	DefaultBufferSize = 1
 )
 
@@ -39,9 +37,22 @@ var (
 	initOnce    sync.Once
 )
 
+// InitInstance allows configuring the global [EventBus] instance.
+// This function can only take effect once, so the return value should be checked to ensure that the intended configuration was applied.
+func InitInstance(confFunc ...ConfigFunc) bool {
+	var didConfigure bool
+	initOnce.Do(func() {
+		instanceBus = NewEventBus(confFunc...)
+		didConfigure = true
+	})
+	return didConfigure
+}
+
 // Instance is useful in cases where a single, global [EventBus] is desired.
 // This can be helpful for accessing and synchronizing events.
-// The global visibility means it's likely not a good fit for concurrent access, since it introduces the potential for configuration race conditions.
+// The global visibility means it's likely not a good fit for concurrent configuration, since it introduces the potential for configuration race conditions.
+//
+// This function doesn't allow configuring the global instance beyond the defaults. Use [InitInstance] to do that.
 func Instance() *EventBus {
 	initOnce.Do(func() {
 		instanceBus = NewEventBus()
@@ -49,21 +60,53 @@ func Instance() *EventBus {
 	return instanceBus
 }
 
-// NewEventBus will create a new [EventBus] with default settings.
-// A bufferSize may be specified to override the value of [DefaultBufferSize].
-func NewEventBus(bufferSize ...int) *EventBus {
-	dispBuf := DefaultBufferSize
-	if len(bufferSize) > 0 {
-		dispBuf = bufferSize[0]
+type busConf struct {
+	bufferSize int
+	numWorkers int
+}
+
+type ConfigFunc func(conf *busConf) error
+
+// BufferSize configures the [EventBus] to use the given size as the size of the dispatch buffer.
+func BufferSize(size int) ConfigFunc {
+	return func(conf *busConf) error {
+		if size < 1 {
+			return fmt.Errorf("size '%d' is invalid, must be >= 1", size)
+		}
+		conf.bufferSize = size
+		return nil
 	}
-	if dispBuf < 1 {
-		panic("buffer size must be >= 1")
+}
+
+// NumWorkers configures the [EventBus] to use the given num as the number of handler goroutines.
+func NumWorkers(num int) ConfigFunc {
+	return func(conf *busConf) error {
+		if num < 1 {
+			return fmt.Errorf("num '%d' is invalid, must be >= 1", num)
+		}
+		conf.numWorkers = num
+		return nil
+	}
+}
+
+// NewEventBus will create a new [EventBus] with default settings.
+// ConfigFuncs may be used to specify different configuration parameters for the [EventBus].
+// If none are specified, then both the dispatch buffer size and the number of handler goroutines will be set to [DefaultBufferSize].
+func NewEventBus(configFunc ...ConfigFunc) *EventBus {
+	conf := busConf{
+		bufferSize: DefaultBufferSize,
+		numWorkers: DefaultBufferSize,
+	}
+	for _, fn := range configFunc {
+		if err := fn(&conf); err != nil {
+			panic(err)
+		}
 	}
 	return &EventBus{
 		handlers:      map[HandlerID]Handler{},
 		handledEvents: map[Event]set.Set[HandlerID]{},
-		events:        make(chan *busDispatch, DefaultBufferSize),
-		eventsSize:    dispBuf,
+		events:        make(chan *busDispatch, conf.bufferSize),
+		numWorkers:    conf.numWorkers,
 	}
 }
 
@@ -106,7 +149,7 @@ type EventBus struct {
 	dispatchLoop    sync.Once
 	stopDispatch    sync.Once
 	doneDispatching sync.WaitGroup
-	eventsSize      int
+	numWorkers      int
 
 	mux           sync.RWMutex
 	events        chan *busDispatch
@@ -230,10 +273,10 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 // This is safe to call multiple times from multiple goroutines. Only the first call to start will begin processing.
 func (b *EventBus) Start(ctx context.Context) *EventBus {
 	b.dispatchLoop.Do(func() {
-		b.doneDispatching.Add(b.eventsSize)
+		b.doneDispatching.Add(b.numWorkers)
 		// Must cache events channel so a goroutine doesn't block after a call to Stop.
 		events := b.events
-		for i := 0; i < b.eventsSize; i++ {
+		for i := 0; i < b.numWorkers; i++ {
 			go b.start(ctx, events)
 		}
 	})

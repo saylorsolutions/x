@@ -64,11 +64,6 @@ func TestEventBus_DispatchResult(t *testing.T) {
 }
 
 func TestEventBus_Dispatch_Async(t *testing.T) {
-	old := DefaultBufferSize
-	defer func() {
-		DefaultBufferSize = old
-	}()
-	DefaultBufferSize = 3
 	var (
 		counter   atomic.Int32
 		asyncErrs atomic.Int32
@@ -94,21 +89,14 @@ func TestEventBus_Dispatch_Async(t *testing.T) {
 }
 
 func TestDispatchBuffer_Invalid(t *testing.T) {
-	old := DefaultBufferSize
-	defer func() {
-		DefaultBufferSize = old
-	}()
-	DefaultBufferSize = 0
 	assert.Panics(t, func() {
-		testEventBus(nil, nil)
+		testEventBus(nil, nil, BufferSize(0))
 	})
-	DefaultBufferSize = old
 	buf := NewEventBus()
-	DefaultBufferSize = 0
 	assert.NotPanics(t, func() {
 		buf.Start(context.Background())
 	})
-	assert.Equal(t, old, buf.eventsSize)
+	assert.Equal(t, 1, buf.numWorkers)
 	buf.AwaitStop(testShutdownTimeout)
 }
 
@@ -147,8 +135,8 @@ func (t *testHandlerImpl) Stop() {
 	t.stopped = true
 }
 
-func testEventBus(handlerCalled, errorReceived *bool) *EventBus {
-	bus := NewEventBus().Start(context.Background())
+func testEventBus(handlerCalled, errorReceived *bool, configFuncs ...ConfigFunc) *EventBus {
+	bus := NewEventBus(configFuncs...).Start(context.Background())
 	bus.Register("test-handler", testEvent, HandlerFunc(func(evt Event, params ...Param) error {
 		if handlerCalled != nil {
 			*handlerCalled = true
