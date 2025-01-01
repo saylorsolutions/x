@@ -29,11 +29,6 @@ const (
 	EventAsyncError              // EventAsyncError is a reserved event used for transmitting processing errors.
 )
 
-const (
-	// DefaultBufferSize dictates the default size of the dispatch channel, and the default number of handler workers.
-	DefaultBufferSize = 1
-)
-
 var (
 	instanceBus *EventBus
 	initOnce    sync.Once
@@ -96,8 +91,8 @@ func OptNumWorkers(num int) ConfigOption {
 // If none are specified, then both the dispatch buffer size and the number of handler goroutines will be set to [DefaultBufferSize].
 func NewEventBus(opts ...ConfigOption) *EventBus {
 	conf := busConf{
-		bufferSize: DefaultBufferSize,
-		numWorkers: DefaultBufferSize,
+		bufferSize: 1,
+		numWorkers: 1,
 	}
 	for _, fn := range opts {
 		if err := fn(&conf); err != nil {
@@ -279,8 +274,11 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 // This is safe to call multiple times from multiple goroutines. Only the first call to start will begin processing.
 func (b *EventBus) Start(ctx context.Context) *EventBus {
 	b.dispatchLoop.Do(func() {
+		if ctx == nil {
+			ctx = context.Background()
+		}
 		events, err := queue.NewChannelQueue[*busDispatch](ctx,
-			queue.OptChannelSize(b.conf.bufferSize), queue.OptInitialBuffer(b.conf.bufferSize),
+			queue.OptChannelSize(b.conf.numWorkers), queue.OptInitialBuffer(b.conf.bufferSize),
 		)
 		if err != nil {
 			// Shouldn't happen
@@ -393,7 +391,7 @@ func (b *EventBus) AwaitStop(timeout time.Duration) {
 }
 
 // Await will return when the [EventBus] is fully shut down.
-// This can be useful when all logic in an application is made up of handlers, and there is no blocking operation to prevent immediately exiting.
+// This can be useful when all logic in an application is made up of handlers and goroutines, and there is no blocking operation to prevent immediately exiting.
 // If no timeout is specified, then this call will block until the start context is cancelled and all goroutines have exited.
 func (b *EventBus) Await(timeout ...time.Duration) {
 	b.events.Await()

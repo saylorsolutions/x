@@ -180,11 +180,13 @@ func (q *ChannelQueue[T]) Len() int {
 // PushRanked will insert an item in the Queue such that its priority is greater than all elements after it.
 // If priority is set to zero, then the item will be appended to the tail.
 func (q *ChannelQueue[T]) PushRanked(val T, priority uint) bool {
-	element := &queueElement[T]{val: val, priority: priority}
 	select {
 	case <-q.ctx.Done():
 		return false
-	case q.recv <- element:
+	default:
+		// Must send separately to ensure that all waiting requests are received.
+		// Using select with this as a case doesn't ensure that.
+		q.recv <- &queueElement[T]{val: val, priority: priority}
 		return true
 	}
 }

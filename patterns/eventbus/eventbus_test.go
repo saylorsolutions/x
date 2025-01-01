@@ -32,22 +32,22 @@ func TestInitInstance(t *testing.T) {
 
 func TestBufferSize_InvalidInput(t *testing.T) {
 	conf := busConf{
-		bufferSize: DefaultBufferSize,
-		numWorkers: DefaultBufferSize,
+		bufferSize: 1,
+		numWorkers: 1,
 	}
 	assert.Error(t, OptBufferSize(0)(&conf))
 	assert.Error(t, OptBufferSize(-1)(&conf))
-	assert.Equal(t, DefaultBufferSize, conf.bufferSize)
+	assert.Equal(t, 1, conf.bufferSize)
 }
 
 func TestNumWorkers_InvalidInput(t *testing.T) {
 	conf := busConf{
-		bufferSize: DefaultBufferSize,
-		numWorkers: DefaultBufferSize,
+		bufferSize: 1,
+		numWorkers: 1,
 	}
 	assert.Error(t, OptNumWorkers(0)(&conf))
 	assert.Error(t, OptNumWorkers(-1)(&conf))
-	assert.Equal(t, DefaultBufferSize, conf.numWorkers)
+	assert.Equal(t, 1, conf.numWorkers)
 }
 
 func TestEventBus_Dispatch(t *testing.T) {
@@ -190,6 +190,16 @@ func TestEventBus_Dispatch_HighVolume(t *testing.T) {
 	bus.AwaitStop(10 * time.Second)
 	t.Logf("Duration for %d events: %s", handled+100, time.Since(start))
 	assert.Equal(t, 200, handled)
+}
+
+func TestEventBus_DispatchResult_ShuttingDown(t *testing.T) {
+	bus := NewEventBus().Start(nil)
+	bus.RegisterFunc("test-handler", testEvent, func(_ Event, _ ...Param) error {
+		t.Error("Should not have received an event")
+		return nil
+	})
+	bus.Stop()
+	assert.ErrorIs(t, bus.DispatchResult(testEvent).Await(), ErrShuttingDown)
 }
 
 var _ Handler = (*testHandlerImpl)(nil)
