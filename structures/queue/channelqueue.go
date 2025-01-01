@@ -32,8 +32,8 @@ type channelQueueConfig struct {
 
 type ChannelQueueOption func(conf *channelQueueConfig) error
 
-// ChannelSize is used to set the buffer size of the input and output channels.
-func ChannelSize(size int) ChannelQueueOption {
+// OptChannelSize is used to set the buffer size of the input and output channels.
+func OptChannelSize(size int) ChannelQueueOption {
 	return func(conf *channelQueueConfig) error {
 		if size < 0 {
 			return fmt.Errorf("invalid channel size '%d'", size)
@@ -43,8 +43,8 @@ func ChannelSize(size int) ChannelQueueOption {
 	}
 }
 
-// InitialBuffer is used to set the initial size of the internal [Queue].
-func InitialBuffer(size int) ChannelQueueOption {
+// OptInitialBuffer is used to set the initial size of the internal [Queue].
+func OptInitialBuffer(size int) ChannelQueueOption {
 	return func(conf *channelQueueConfig) error {
 		if size < 0 {
 			return fmt.Errorf("invalid queue initial buffer size '%d'", size)
@@ -179,32 +179,32 @@ func (q *ChannelQueue[T]) Len() int {
 
 // PushRanked will insert an item in the Queue such that its priority is greater than all elements after it.
 // If priority is set to zero, then the item will be appended to the tail.
-func (q *ChannelQueue[T]) PushRanked(val T, priority uint) {
+func (q *ChannelQueue[T]) PushRanked(val T, priority uint) bool {
+	element := &queueElement[T]{val: val, priority: priority}
 	select {
 	case <-q.ctx.Done():
-		return
-	default:
-		q.recv <- &queueElement[T]{val: val, priority: priority}
+		return false
+	case q.recv <- element:
+		return true
 	}
 }
 
 // Push will push an item to the tail of the ChannelQueue.
-func (q *ChannelQueue[T]) Push(val T) {
-	q.PushRanked(val, 0)
+func (q *ChannelQueue[T]) Push(val T) bool {
+	return q.PushRanked(val, 0)
 }
 
 // Pop will pop an item from the head of the ChannelQueue.
 // False will be returned if the ChannelQueue is empty.
 func (q *ChannelQueue[T]) Pop() (T, bool) {
+	var mt T
 	select {
 	case val, more := <-q.disp:
 		if !more {
-			var mt T
 			return mt, false
 		}
 		return val, true
 	default:
-		var mt T
 		return mt, false
 	}
 }

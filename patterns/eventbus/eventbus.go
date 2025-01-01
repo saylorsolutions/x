@@ -14,6 +14,7 @@ import (
 var (
 	ErrNoHandler    = errors.New("no handler found")
 	ErrInvalidEvent = errors.New("event ID 0 cannot be dispatched")
+	ErrShuttingDown = errors.New("dispatch cannot be completed, event bus is shutting down")
 )
 
 // Event is a unique ID for an event in a domain.
@@ -40,7 +41,7 @@ var (
 
 // InitInstance allows configuring the global [EventBus] instance.
 // This function can only take effect once, so the return value should be checked to ensure that the intended configuration was applied.
-func InitInstance(confFunc ...ConfigFunc) bool {
+func InitInstance(confFunc ...ConfigOption) bool {
 	var didConfigure bool
 	initOnce.Do(func() {
 		instanceBus = NewEventBus(confFunc...)
@@ -66,10 +67,10 @@ type busConf struct {
 	numWorkers int
 }
 
-type ConfigFunc func(conf *busConf) error
+type ConfigOption func(conf *busConf) error
 
-// BufferSize configures the [EventBus] to use the given size as the size of the dispatch buffer.
-func BufferSize(size int) ConfigFunc {
+// OptBufferSize configures the [EventBus] to use the given size as the size of the dispatch buffer.
+func OptBufferSize(size int) ConfigOption {
 	return func(conf *busConf) error {
 		if size < 1 {
 			return fmt.Errorf("size '%d' is invalid, must be >= 1", size)
@@ -79,8 +80,8 @@ func BufferSize(size int) ConfigFunc {
 	}
 }
 
-// NumWorkers configures the [EventBus] to use the given num as the number of handler goroutines.
-func NumWorkers(num int) ConfigFunc {
+// OptNumWorkers configures the [EventBus] to use the given num as the number of handler goroutines.
+func OptNumWorkers(num int) ConfigOption {
 	return func(conf *busConf) error {
 		if num < 1 {
 			return fmt.Errorf("num '%d' is invalid, must be >= 1", num)
@@ -93,12 +94,12 @@ func NumWorkers(num int) ConfigFunc {
 // NewEventBus will create a new [EventBus] with default settings.
 // ConfigFuncs may be used to specify different configuration parameters for the [EventBus].
 // If none are specified, then both the dispatch buffer size and the number of handler goroutines will be set to [DefaultBufferSize].
-func NewEventBus(configFunc ...ConfigFunc) *EventBus {
+func NewEventBus(opts ...ConfigOption) *EventBus {
 	conf := busConf{
 		bufferSize: DefaultBufferSize,
 		numWorkers: DefaultBufferSize,
 	}
-	for _, fn := range configFunc {
+	for _, fn := range opts {
 		if err := fn(&conf); err != nil {
 			panic(err)
 		}
@@ -172,7 +173,8 @@ func (b *EventBus) Dispatch(evt Event, params ...Param) {
 	b.events.Push(dispatch)
 }
 
-// DispatchResult will submit an event to the [EventBus] for propagation, and block until a result is returned.
+// DispatchResult will submit an event to the [EventBus] for propagation.
+// If the [EventBus] is shutting down, then
 // If an error is returned, then an [EventAsyncError] is still propagated to an appropriate handler, if registered.
 func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error] {
 	if evt == EventNone {
@@ -184,7 +186,9 @@ func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error
 		params: params,
 		future: syncx.NewFuture[error](),
 	}
-	b.events.Push(dispatch)
+	if !b.events.Push(dispatch) {
+		dispatch.future.Resolve(ErrShuttingDown)
+	}
 	return dispatch.future
 }
 
@@ -276,7 +280,7 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 func (b *EventBus) Start(ctx context.Context) *EventBus {
 	b.dispatchLoop.Do(func() {
 		events, err := queue.NewChannelQueue[*busDispatch](ctx,
-			queue.ChannelSize(b.conf.bufferSize), queue.InitialBuffer(b.conf.bufferSize),
+			queue.OptChannelSize(b.conf.bufferSize), queue.OptInitialBuffer(b.conf.bufferSize),
 		)
 		if err != nil {
 			// Shouldn't happen
@@ -299,7 +303,10 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 			handler.Stop()
 		}
 	}()
-	var errs []error
+	var (
+		errs  []error
+		ctxCh = ctx.Done()
+	)
 	for {
 		if len(errs) > 0 {
 			// Dispatch errors
@@ -323,9 +330,9 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 			errs = nil
 		}
 		select {
-		case <-ctx.Done():
+		case <-ctxCh:
 			b.Stop()
-			return
+			ctxCh = nil
 		case dispatch, more := <-events.C:
 			if !more {
 				return

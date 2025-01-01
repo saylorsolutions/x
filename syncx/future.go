@@ -22,11 +22,10 @@ func NewFuture[T any]() Future[T] {
 	f := &future[T]{
 		ch: make(chan *resultPair[T], 1),
 	}
-	f.cacheSet.Add(1)
 	return f
 }
 
-// SymbolicFuture returns a [Future] that does nothing.
+// SymbolicFuture returns a [Future] that returns a zero value and nil error.
 // It's used to satisfy an interface constraint when no actual result will be returned, and conserves resource.
 func SymbolicFuture[T any]() Future[T] {
 	return &staticFuture[T]{}
@@ -54,7 +53,6 @@ func NewFutureErr[T any]() FutureErr[T] {
 	f := &future[T]{
 		ch: make(chan *resultPair[T], 1),
 	}
-	f.cacheSet.Add(1)
 	return f
 }
 
@@ -81,7 +79,6 @@ type future[T any] struct {
 	resolve  sync.Once
 	cacheVal T
 	cacheErr error
-	cacheSet sync.WaitGroup
 }
 
 func (f *future[T]) Resolve(val T) {
@@ -96,10 +93,9 @@ func (f *future[T]) Await(timeout ...time.Duration) T {
 func (f *future[T]) ResolveErr(val T, err error) {
 	f.resolve.Do(func() {
 		f.ch <- &resultPair[T]{val: val, err: err}
-		close(f.ch)
 		f.cacheVal = val
 		f.cacheErr = err
-		f.cacheSet.Done()
+		close(f.ch)
 	})
 }
 
@@ -119,7 +115,6 @@ func (f *future[T]) await(ctx context.Context) (T, error) {
 	select {
 	case pair, more := <-f.ch:
 		if !more {
-			f.cacheSet.Wait()
 			return f.cacheVal, f.cacheErr
 		}
 		return pair.val, pair.err
