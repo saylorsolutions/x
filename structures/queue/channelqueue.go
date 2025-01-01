@@ -70,10 +70,15 @@ func NewChannelQueue[T any](ctx context.Context, opts ...ChannelQueueOption) (*C
 	)
 	ctx, cancel = context.WithCancel(ctx)
 	cq := &ChannelQueue[T]{
-		queue:   NewQueue[T](conf.queueInitialBuffer),
 		ctx:     ctx,
 		stop:    cancel,
 		stopped: make(chan struct{}),
+	}
+
+	if conf.queueInitialBuffer > 0 {
+		cq.queue = NewQueue[T](conf.queueInitialBuffer)
+	} else {
+		cq.queue = NewQueue[T]()
 	}
 
 	if conf.channelSize == 0 {

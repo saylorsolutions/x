@@ -25,7 +25,7 @@ func TestInitInstance(t *testing.T) {
 	})
 	result := InitInstance(BufferSize(2), NumWorkers(4))
 	assert.True(t, result, "Should have configured the global instance")
-	assert.Equal(t, 4, Instance().numWorkers)
+	assert.Equal(t, 4, Instance().conf.numWorkers)
 	result = InitInstance(BufferSize(1), NumWorkers(1))
 	assert.False(t, result, "Instance was already configured, shouldn't have happened again")
 }
@@ -129,7 +129,7 @@ func TestDispatchBuffer_Invalid(t *testing.T) {
 	assert.NotPanics(t, func() {
 		buf.Start(context.Background())
 	})
-	assert.Equal(t, 1, buf.numWorkers)
+	assert.Equal(t, 1, buf.conf.numWorkers)
 	buf.AwaitStop(testShutdownTimeout)
 }
 

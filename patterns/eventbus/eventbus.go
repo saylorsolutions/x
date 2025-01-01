@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/saylorsolutions/x/structures/queue"
 	"github.com/saylorsolutions/x/structures/set"
 	"github.com/saylorsolutions/x/syncx"
 	"sync"
@@ -105,8 +106,7 @@ func NewEventBus(configFunc ...ConfigFunc) *EventBus {
 	return &EventBus{
 		handlers:      map[HandlerID]Handler{},
 		handledEvents: map[Event]set.Set[HandlerID]{},
-		events:        make(chan *busDispatch, conf.bufferSize),
-		numWorkers:    conf.numWorkers,
+		conf:          conf,
 	}
 }
 
@@ -119,7 +119,6 @@ func Paramf(format string, args ...any) Param {
 type HandlerID string
 
 // Handler describes a component of the program that handles events received from the [EventBus].
-// Handlers should return quickly to prevent blocking other events, and may spin up additional goroutines to support this.
 type Handler interface {
 	// HandleEvent will handle the given event and do some kind of processing.
 	// Returned errors will be reported with a dispatched [EventAsyncError].
@@ -149,17 +148,17 @@ type EventBus struct {
 	dispatchLoop    sync.Once
 	stopDispatch    sync.Once
 	doneDispatching sync.WaitGroup
-	numWorkers      int
 
 	mux           sync.RWMutex
-	events        chan *busDispatch
+	events        *queue.ChannelQueue[*busDispatch]
 	handlers      map[HandlerID]Handler
 	handledEvents map[Event]set.Set[HandlerID]
+	conf          busConf
 }
 
 // Dispatch will submit an event to the [EventBus] for propagation.
 // If an error occurs, then an [EventAsyncError] is propagated to an appropriate handler, if registered.
-// If the EventBus is stopping, then this call will block indefinitely.
+// If the EventBus is stopping, then this call will immediately return without dispatching.
 func (b *EventBus) Dispatch(evt Event, params ...Param) {
 	if evt == EventNone {
 		b.DispatchError(ErrInvalidEvent)
@@ -170,7 +169,7 @@ func (b *EventBus) Dispatch(evt Event, params ...Param) {
 		params: params,
 		future: syncx.SymbolicFuture[error](),
 	}
-	b.events <- dispatch
+	b.events.Push(dispatch)
 }
 
 // DispatchResult will submit an event to the [EventBus] for propagation, and block until a result is returned.
@@ -185,7 +184,7 @@ func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error
 		params: params,
 		future: syncx.NewFuture[error](),
 	}
-	b.events <- dispatch
+	b.events.Push(dispatch)
 	return dispatch.future
 }
 
@@ -232,6 +231,9 @@ func (b *EventBus) UnRegister(id HandlerID) {
 		}
 		handler.Stop()
 		delete(b.handlers, id)
+		for _, handlerSet := range b.handledEvents {
+			handlerSet.Remove(id)
+		}
 	})
 }
 
@@ -273,17 +275,24 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 // This is safe to call multiple times from multiple goroutines. Only the first call to start will begin processing.
 func (b *EventBus) Start(ctx context.Context) *EventBus {
 	b.dispatchLoop.Do(func() {
-		b.doneDispatching.Add(b.numWorkers)
+		events, err := queue.NewChannelQueue[*busDispatch](ctx,
+			queue.ChannelSize(b.conf.bufferSize), queue.InitialBuffer(b.conf.bufferSize),
+		)
+		if err != nil {
+			// Shouldn't happen
+			panic(err)
+		}
+		b.events = events
+		b.doneDispatching.Add(b.conf.numWorkers)
 		// Must cache events channel so a goroutine doesn't block after a call to Stop.
-		events := b.events
-		for i := 0; i < b.numWorkers; i++ {
+		for i := 0; i < b.conf.numWorkers; i++ {
 			go b.start(ctx, events)
 		}
 	})
 	return b
 }
 
-func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
+func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDispatch]) {
 	defer b.doneDispatching.Done()
 	defer func() {
 		for _, handler := range b.handlers {
@@ -317,7 +326,7 @@ func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
 		case <-ctx.Done():
 			b.Stop()
 			return
-		case dispatch, more := <-events:
+		case dispatch, more := <-events.C:
 			if !more {
 				return
 			}
@@ -364,21 +373,33 @@ func (b *EventBus) start(ctx context.Context, events chan *busDispatch) {
 // This is safe to call multiple times from multiple goroutines if needed.
 func (b *EventBus) Stop() {
 	b.stopDispatch.Do(func() {
-		events := b.events
-		b.events = nil
-		close(events)
+		b.events.Stop()
 	})
 }
 
 // AwaitStop will halt event processing for the [EventBus] if it's running, and wait for processing to stop.
-// A timeout value may be used to set a deadline for stopping.
+// The given timeout value will be used to set a deadline for stopping.
 // Calling this when the [EventBus] is already stopped will return immediately.
 func (b *EventBus) AwaitStop(timeout time.Duration) {
 	b.Stop()
-	wait, cancel := context.WithTimeout(context.Background(), timeout)
-	go func() {
-		defer cancel()
+	b.Await(timeout)
+}
+
+// Await will return when the [EventBus] is fully shut down.
+// This can be useful when all logic in an application is made up of handlers, and there is no blocking operation to prevent immediately exiting.
+// If no timeout is specified, then this call will block until the start context is cancelled and all goroutines have exited.
+func (b *EventBus) Await(timeout ...time.Duration) {
+	b.events.Await()
+	var _timeout time.Duration
+	if len(timeout) > 0 && timeout[0] > 0 {
+		_timeout = timeout[0]
+		wait, cancel := context.WithTimeout(context.Background(), _timeout)
+		go func() {
+			defer cancel()
+			b.doneDispatching.Wait()
+		}()
+		<-wait.Done()
+	} else {
 		b.doneDispatching.Wait()
-	}()
-	<-wait.Done()
+	}
 }
