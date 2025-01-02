@@ -56,9 +56,11 @@ This event will be dispatched to all currently registered handlers that indicate
 To also receive an error from a [Handler], use [EventBus.DispatchResult] that returns a [Future].
 The first error that occurs will be returned via the [Future], and all errors will still be dispatched to any registered error handlers.
 
+Note that using [EventBus.DispatchResult] in handlers can cause a deadlock/livelock.
+This happens when the [EventBus] processing goroutine(s) are trying to process events while handlers are blocking on receiving a result.
+
 To dispatch an error outside a [Handler], use either the [EventBus.DispatchError] or [EventBus.DispatchErrorf] methods.
-Note that using these methods in handlers can cause a deadlock when the processing goroutines are trying to process events while handlers are trying to dispatch errors.
-To return an error from a Handlers, just return it from the processing method/function.
+To return an error from a [Handler], just return it from the processing method/function.
 
 [Future]: github.com/saylorsolutions/x/syncx/future.go
 */
