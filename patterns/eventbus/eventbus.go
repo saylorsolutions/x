@@ -155,6 +155,8 @@ type EventBus struct {
 // Dispatch will submit an event to the [EventBus] for propagation.
 // If an error occurs, then an [EventAsyncError] is propagated to an appropriate handler, if registered.
 // If the EventBus is stopping, then this call will immediately return without dispatching.
+//
+// This can safely be called from within a [Handler].
 func (b *EventBus) Dispatch(evt Event, params ...Param) {
 	if evt == EventNone {
 		b.DispatchError(ErrInvalidEvent)
@@ -171,6 +173,8 @@ func (b *EventBus) Dispatch(evt Event, params ...Param) {
 // DispatchResult will submit an event to the [EventBus] for propagation.
 // If the [EventBus] is shutting down, then
 // If an error is returned, then an [EventAsyncError] is still propagated to an appropriate handler, if registered.
+//
+// NOTE: This should not be called from within a [Handler], because it implicitly blocks a goroutine used for handling dispatches.
 func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error] {
 	if evt == EventNone {
 		b.DispatchError(ErrInvalidEvent)
