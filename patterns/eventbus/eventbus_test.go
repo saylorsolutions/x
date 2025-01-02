@@ -52,16 +52,17 @@ func TestNumWorkers_InvalidInput(t *testing.T) {
 
 func TestEventBus_Dispatch(t *testing.T) {
 	var (
-		errorReceived, handlerCalled bool
+		errorReceived, handlerCalled atomic.Bool
 	)
 	bus := testEventBus(&handlerCalled, &errorReceived)
 	defer bus.AwaitStop(testShutdownTimeout)
 
 	bus.Dispatch(testEvent, "A message")
 	time.Sleep(50 * time.Millisecond)
+	bus.AwaitStop(testShutdownTimeout)
 
-	assert.False(t, errorReceived, "Should not receive an error")
-	assert.True(t, handlerCalled, "Handler should have been called")
+	assert.False(t, errorReceived.Load(), "Should not receive an error")
+	assert.True(t, handlerCalled.Load(), "Handler should have been called")
 }
 
 func TestEventBus_Dispatch_MissingEvent(t *testing.T) {
@@ -76,24 +77,25 @@ func TestEventBus_Dispatch_MissingEvent(t *testing.T) {
 
 func TestEventBus_DispatchResult(t *testing.T) {
 	var (
-		errorReceived, handlerCalled bool
+		errorReceived, handlerCalled atomic.Bool
 	)
 	bus := testEventBus(&handlerCalled, &errorReceived)
 	defer bus.AwaitStop(testShutdownTimeout)
 
-	if err := bus.DispatchResult(testEvent, "A message").Await(testAwaitTimeout); err != nil {
+	if err := bus.DispatchResult(testEvent, "A message").Await(); err != nil {
 		t.Errorf("Should not have received error: %v", err)
 	}
-	assert.False(t, errorReceived, "Should not receive an error")
-	assert.True(t, handlerCalled, "Handler should have been called")
+	assert.False(t, errorReceived.Load(), "Should not receive an error")
+	assert.True(t, handlerCalled.Load(), "Handler should have been called")
 
-	handlerCalled = false
-	errorReceived = false
-	if err := bus.DispatchResult(testEvent, 5).Await(testAwaitTimeout); err == nil {
+	handlerCalled.Store(false)
+	errorReceived.Store(false)
+	if err := bus.DispatchResult(testEvent, 5).Await(); err == nil {
 		t.Error("Should have received error")
 	}
-	assert.True(t, errorReceived, "Should receive an error")
-	assert.True(t, handlerCalled, "Handler should have been called")
+	bus.AwaitStop(testShutdownTimeout)
+	assert.True(t, errorReceived.Load(), "Should receive an error")
+	assert.True(t, handlerCalled.Load(), "Handler should have been called")
 }
 
 func TestEventBus_Dispatch_Async(t *testing.T) {
@@ -222,11 +224,11 @@ func (t *testHandlerImpl) Stop() {
 	t.stopped = true
 }
 
-func testEventBus(handlerCalled, errorReceived *bool, configFuncs ...ConfigOption) *EventBus {
+func testEventBus(handlerCalled, errorReceived *atomic.Bool, configFuncs ...ConfigOption) *EventBus {
 	bus := NewEventBus(configFuncs...).Start(context.Background())
 	bus.Register("test-handler", testEvent, HandlerFunc(func(evt Event, params ...Param) error {
 		if handlerCalled != nil {
-			*handlerCalled = true
+			handlerCalled.Store(true)
 		}
 		var param string
 		spec := ParamSpec(1,
@@ -243,8 +245,8 @@ func testEventBus(handlerCalled, errorReceived *bool, configFuncs ...ConfigOptio
 	return bus
 }
 
-func testShouldNotFail(received *bool) func(err error) {
+func testShouldNotFail(received *atomic.Bool) func(err error) {
 	return func(err error) {
-		*received = true
+		received.Store(true)
 	}
 }
