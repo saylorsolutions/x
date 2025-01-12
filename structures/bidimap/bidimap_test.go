@@ -15,6 +15,9 @@ func TestNew(t *testing.T) {
 
 func TestBidiMap_Add(t *testing.T) {
 	m := new(BidiMap[int, string])
+
+	assert.Equal(t, "", m.Value(1))
+
 	m.Add(1, "one")
 	assert.True(t, m.HasValue("one"))
 	assert.True(t, m.HasKey(1))

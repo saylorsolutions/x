@@ -65,6 +65,37 @@ func (s Set[T]) Has(val T) bool {
 	return ok
 }
 
+// HasAny determines if any of the given values are present in the [Set].
+// If the parameter list is empty, then false is returned.
+func (s Set[T]) HasAny(values ...T) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, value := range values {
+		if s.Has(value) {
+			return true
+		}
+	}
+	return false
+}
+
+// HasAll determines if all given values are present in the [Set].
+// If the parameter list is empty, then false is returned.
+func (s Set[T]) HasAll(values ...T) bool {
+	if len(s) == 0 {
+		return false
+	}
+	if len(values) == 0 {
+		return false
+	}
+	for _, value := range values {
+		if !s.Has(value) {
+			return false
+		}
+	}
+	return true
+}
+
 // Intersection returns a new [Set] with only the values common between sets.
 func (s Set[T]) Intersection(other Set[T]) Set[T] {
 	inter := Set[T]{}
@@ -97,4 +128,8 @@ func (s Set[T]) Union(other Set[T]) Set[T] {
 		union.Add(v)
 	}
 	return union
+}
+
+func (s Set[T]) Copy() Set[T] {
+	return New[T](s.Slice()...)
 }
