@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net/http"
 )
@@ -12,8 +11,6 @@ const (
 )
 
 var (
-	ErrClientError  = errors.New("client error")
-	ErrServerError  = errors.New("server error")
 	ContentTypeJSON = "application/json" // This can be used to customize the content type reported to the client.
 )
 

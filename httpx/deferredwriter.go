@@ -58,3 +58,17 @@ func (d *DeferredWriter) Commit() error {
 	}
 	return nil
 }
+
+// DeferMiddleware will create a [DeferredWriter] and pass it to wrapped handlers.
+// Commit will be called after the handler returns.
+func DeferMiddleware() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			dw := NewDeferredWriter(w)
+			defer func() {
+				_ = dw.Commit()
+			}()
+			next.ServeHTTP(dw, r)
+		})
+	}
+}
