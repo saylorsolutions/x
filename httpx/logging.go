@@ -30,23 +30,25 @@ func (f RequestLoggerFunc) Log(statusCode int, method, path string, dur time.Dur
 }
 
 // LoggingMiddleware will log each request to the given [http.Handler], including status code, method, path, and duration.
-func LoggingMiddleware(logger RequestLogger, next http.Handler) http.Handler {
+func LoggingMiddleware(logger RequestLogger) Middleware {
 	if logger == nil {
 		panic("nil logger")
 	}
-	if next == nil {
-		panic("nil handler")
+	return func(next http.Handler) http.Handler {
+		if next == nil {
+			panic("nil handler")
+		}
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			lw := &loggingWriter{w, http.StatusOK}
+			start := time.Now()
+			defer func() {
+				dur := time.Since(start)
+				code := lw.statusCode
+				logger.Log(code, r.Method, r.URL.Path, dur)
+			}()
+			next.ServeHTTP(lw, r)
+		})
 	}
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		lw := &loggingWriter{w, http.StatusOK}
-		start := time.Now()
-		defer func() {
-			dur := time.Since(start)
-			code := lw.statusCode
-			logger.Log(code, r.Method, r.URL.Path, dur)
-		}()
-		next.ServeHTTP(lw, r)
-	})
 }
 
 // StdLogger returns a [RequestLogger] that wraps a [*log.Logger].
