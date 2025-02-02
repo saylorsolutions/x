@@ -2,7 +2,6 @@
 package iterx
 
 import (
-	"fmt"
 	"iter"
 )
 
@@ -130,7 +129,7 @@ func (i SliceIter[T]) WithIndex() MapIter[int, T] {
 
 func (i SliceIter[T]) Limit(limit int) SliceIter[T] {
 	if limit <= 0 {
-		panic(fmt.Sprintf("invalid limit: %d", limit))
+		return func(yield func(T) bool) {}
 	}
 	return func(yield func(T) bool) {
 		count := 0
@@ -283,7 +282,7 @@ func (i MapIter[K, V]) Count() int {
 
 func (i MapIter[K, V]) Limit(limit int) MapIter[K, V] {
 	if limit <= 0 {
-		panic(fmt.Sprintf("invalid limit: %d", limit))
+		return func(yield func(K, V) bool) {}
 	}
 	return func(yield func(K, V) bool) {
 		count := 0
