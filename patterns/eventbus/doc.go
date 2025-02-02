@@ -62,6 +62,11 @@ This happens when the [EventBus] processing goroutine(s) are trying to process e
 To dispatch an error outside a [Handler], use either the [EventBus.DispatchError] or [EventBus.DispatchErrorf] methods.
 To return an error from a [Handler], just return it from the processing method/function.
 
+# Debugging EventBus
+
+Debug logging may be enabled with the relevant option, or controlled by setting the environment variable EVENTBUS_DEBUG to a boolean value.
+Note that this will emit a LOT of output to stdout during normal operation and should not be enabled normally.
+
 [Future]: github.com/saylorsolutions/x/syncx/future.go
 */
 package eventbus

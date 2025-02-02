@@ -22,15 +22,19 @@ func newMockConn() (*mockConn, error) {
 	return new(mockConn), nil
 }
 
+func keepAliveMockConn(conn *mockConn) error {
+	return nil
+}
+
 func TestConnPool_Acquire_Exhausted(t *testing.T) {
-	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, 1)
+	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, keepAliveMockConn, 1, OptEnableDebugLogging())
 	require.NoError(t, err)
 	require.NotNil(t, pool)
 
 	first, err := pool.Acquire()
 	assert.NoError(t, err)
 	assert.NotNil(t, first)
-	assert.Equal(t, 1.0, pool.PoolStats().Utilization)
+	assert.Equal(t, 1.0, pool.Stats().Utilization)
 
 	second, err := pool.Acquire()
 	assert.ErrorIs(t, err, ErrPoolExhausted)
@@ -41,9 +45,10 @@ func TestConnPool_Acquire_Exhausted(t *testing.T) {
 }
 
 func TestConnPool_Return(t *testing.T) {
-	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, 1,
+	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, keepAliveMockConn, 1,
 		OptIdleBehavior(100*time.Millisecond, 75*time.Millisecond),
 		OptMinConnections(0),
+		OptEnableDebugLogging(),
 	)
 	require.NoError(t, err)
 	require.NotNil(t, pool)
@@ -52,9 +57,9 @@ func TestConnPool_Return(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotNil(t, conn)
 	assert.Equal(t, stateLeased, pool.conns[0].state)
-	assert.Equal(t, 1.0, pool.PoolStats().Utilization)
+	assert.Equal(t, 1.0, pool.Stats().Utilization)
 	pool.Release(conn)
-	assert.Equal(t, 0.0, pool.PoolStats().Utilization)
+	assert.Equal(t, 0.0, pool.Stats().Utilization)
 	assert.Equal(t, stateAvailable, pool.conns[0].state)
 	assert.True(t, pool.conns[0].idleDeadline.After(time.Now()))
 	time.Sleep(300 * time.Millisecond)
@@ -63,16 +68,18 @@ func TestConnPool_Return(t *testing.T) {
 }
 
 func TestNewConnectionPool_MinStarted(t *testing.T) {
-	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, 1,
+	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, keepAliveMockConn, 1,
 		OptIdleBehavior(100*time.Millisecond, 75*time.Millisecond),
 		OptMinConnections(3),
+		OptEnableDebugLogging(),
 	)
 	assert.ErrorIs(t, err, ErrConfig)
 	assert.Nil(t, pool)
 
-	pool, err = NewConnectionPool[*mockConn](context.TODO(), newMockConn, 3,
+	pool, err = NewConnectionPool[*mockConn](context.TODO(), newMockConn, keepAliveMockConn, 3,
 		OptIdleBehavior(100*time.Millisecond, 75*time.Millisecond),
 		OptMinConnections(3),
+		OptEnableDebugLogging(),
 	)
 	assert.NoError(t, err)
 	assert.NotNil(t, pool)

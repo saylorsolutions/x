@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/saylorsolutions/x/env"
 	"github.com/saylorsolutions/x/structures/queue"
 	"github.com/saylorsolutions/x/structures/set"
 	"github.com/saylorsolutions/x/syncx"
+	"log"
 	"sync"
 	"time"
 )
@@ -58,8 +60,9 @@ func Instance() *EventBus {
 }
 
 type busConf struct {
-	bufferSize int
-	numWorkers int
+	bufferSize   int
+	numWorkers   int
+	debugLogging bool
 }
 
 type ConfigOption func(conf *busConf) error
@@ -86,13 +89,24 @@ func OptNumWorkers(num int) ConfigOption {
 	}
 }
 
+// OptEnableDebugLogging enables debug logging for this [EventBus].
+//
+// This can also be controlled by setting the environment variable EVENTBUS_DEBUG to a boolean value.
+func OptEnableDebugLogging() ConfigOption {
+	return func(conf *busConf) error {
+		conf.debugLogging = true
+		return nil
+	}
+}
+
 // NewEventBus will create a new [EventBus] with default settings.
 // ConfigFuncs may be used to specify different configuration parameters for the [EventBus].
 // If none are specified, then both the dispatch buffer size and the number of handler goroutines will be set to [DefaultBufferSize].
 func NewEventBus(opts ...ConfigOption) *EventBus {
 	conf := busConf{
-		bufferSize: 1,
-		numWorkers: 1,
+		bufferSize:   1,
+		numWorkers:   1,
+		debugLogging: env.Bool("EVENTBUS_DEBUG", false),
 	}
 	for _, fn := range opts {
 		if err := fn(&conf); err != nil {
@@ -152,6 +166,14 @@ type EventBus struct {
 	conf          busConf
 }
 
+func (b *EventBus) debug(args ...any) {
+	if !b.conf.debugLogging {
+		return
+	}
+	args = append([]any{"[EVENTBUS_DEBUG]"}, args...)
+	log.Println(args...)
+}
+
 // Dispatch will submit an event to the [EventBus] for propagation.
 // If an error occurs, then an [EventAsyncError] is propagated to an appropriate handler, if registered.
 // If the EventBus is stopping, then this call will immediately return without dispatching.
@@ -160,6 +182,7 @@ type EventBus struct {
 func (b *EventBus) Dispatch(evt Event, params ...Param) {
 	if evt == EventNone {
 		b.DispatchError(ErrInvalidEvent)
+		b.debug("no event specified for dispatch")
 		return
 	}
 	dispatch := &busDispatch{
@@ -168,6 +191,7 @@ func (b *EventBus) Dispatch(evt Event, params ...Param) {
 		future: syncx.SymbolicFuture[error](),
 	}
 	b.events.Push(dispatch)
+	b.debug("event published to queue")
 }
 
 // DispatchResult will submit an event to the [EventBus] for propagation.
@@ -178,6 +202,7 @@ func (b *EventBus) Dispatch(evt Event, params ...Param) {
 func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error] {
 	if evt == EventNone {
 		b.DispatchError(ErrInvalidEvent)
+		b.debug("no event specified for dispatch")
 		return syncx.StaticFuture(ErrInvalidEvent)
 	}
 	dispatch := &busDispatch{
@@ -188,6 +213,7 @@ func (b *EventBus) DispatchResult(evt Event, params ...Param) syncx.Future[error
 	if !b.events.Push(dispatch) {
 		dispatch.future.Resolve(ErrShuttingDown)
 	}
+	b.debug("event published to the queue, returning future")
 	return dispatch.future
 }
 
@@ -197,12 +223,14 @@ func (b *EventBus) DispatchErrorf(format string, args ...any) {
 
 func (b *EventBus) DispatchError(err error) {
 	b.Dispatch(EventAsyncError, err)
+	b.debug("error published to queue")
 }
 
 func (b *EventBus) Register(id HandlerID, handledEvent Event, handler Handler) {
 	syncx.LockFunc(&b.mux, func() {
 		b.handlers[id] = handler
 		b.handledEvents[handledEvent] = b.handledEvents[handledEvent].Add(id)
+		b.debug("handler", id, "registered in the event bus to handle event", handledEvent)
 	})
 }
 
@@ -219,11 +247,13 @@ func (b *EventBus) RegisterErrorHandler(id HandlerID, handler func(error)) {
 			AssertAndStore(&err),
 		)
 		if errs := spec(params); len(errs) > 0 {
+			b.debug("received invalid parameters in error handler dispatcher:", params)
 			return fmt.Errorf("expected a single error parameter: %w", err)
 		}
 		handler(err)
 		return nil
 	}))
+	b.debug("error handler registered")
 }
 
 func (b *EventBus) UnRegister(id HandlerID) {
@@ -238,6 +268,7 @@ func (b *EventBus) UnRegister(id HandlerID) {
 			handlerSet.Remove(id)
 		}
 	})
+	b.debug("unregistered handler", id)
 }
 
 func (b *EventBus) AddHandledEvent(id HandlerID, evt Event) error {
@@ -247,6 +278,7 @@ func (b *EventBus) AddHandledEvent(id HandlerID, evt Event) error {
 			return fmt.Errorf("no registered handler with id '%s'", id)
 		}
 		b.handledEvents[evt] = b.handledEvents[evt].Add(id)
+		b.debug("handler", id, "updated to handle event", evt)
 		return nil
 	})
 }
@@ -258,6 +290,7 @@ func (b *EventBus) SetHandledExclusive(id HandlerID, evt Event) error {
 			return fmt.Errorf("no registered handler with id '%s'", id)
 		}
 		b.handledEvents[evt] = set.New(id)
+		b.debug("handler", id, "updated to handle event", evt, "exclusively")
 		return nil
 	})
 }
@@ -269,6 +302,7 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 			return fmt.Errorf("no registered handler with id '%s'", id)
 		}
 		b.handledEvents[evt] = b.handledEvents[evt].Remove(id)
+		b.debug("handler", id, "updated to not handle event", evt)
 		return nil
 	})
 }
@@ -277,6 +311,7 @@ func (b *EventBus) RemoveHandledEvent(id HandlerID, evt Event) error {
 // Once the [EventBus] has stopped processing events, it cannot be restarted.
 // This is safe to call multiple times from multiple goroutines. Only the first call to start will begin processing.
 func (b *EventBus) Start(ctx context.Context) *EventBus {
+	b.debug("EventBus.Start called")
 	b.dispatchLoop.Do(func() {
 		if ctx == nil {
 			ctx = context.Background()
@@ -285,6 +320,7 @@ func (b *EventBus) Start(ctx context.Context) *EventBus {
 			queue.OptChannelSize(b.conf.numWorkers), queue.OptInitialBuffer(b.conf.bufferSize),
 		)
 		if err != nil {
+			b.debug("error setting up channel queue:", err)
 			// Shouldn't happen
 			panic(err)
 		}
@@ -292,13 +328,15 @@ func (b *EventBus) Start(ctx context.Context) *EventBus {
 		b.doneDispatching.Add(b.conf.numWorkers)
 		// Must cache events channel so a goroutine doesn't block after a call to Stop.
 		for i := 0; i < b.conf.numWorkers; i++ {
-			go b.start(ctx, events)
+			b.debug("starting event dispatch worker")
+			go b.start(ctx, i, events)
 		}
 	})
 	return b
 }
 
-func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDispatch]) {
+func (b *EventBus) start(ctx context.Context, workerNum int, events *queue.ChannelQueue[*busDispatch]) {
+	var debugLabel = fmt.Sprintf("[worker %d]", workerNum)
 	defer b.doneDispatching.Done()
 	defer func() {
 		for _, handler := range b.handlers {
@@ -311,11 +349,11 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 	)
 	for {
 		if len(errs) > 0 {
-			// Dispatch errors
+			b.debug(debugLabel, "dispatching errors from handlers")
 			syncx.RLockFunc(&b.mux, func() {
 				errHandlerIDs := b.handledEvents[EventAsyncError]
 				if len(errHandlerIDs) == 0 {
-					// No registered error handlers, nothing to do.
+					b.debug(debugLabel, "no registered error handlers")
 					return
 				}
 				for _, err := range errs {
@@ -324,8 +362,9 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 						if handler == nil {
 							continue
 						}
-						// No recourse for error handler returning an error in this context.
-						_ = handler.HandleEvent(EventAsyncError, err)
+						if herr := handler.HandleEvent(EventAsyncError, err); herr != nil {
+							b.debug(debugLabel, "error from error handler,", herr, ", while handling error:", err)
+						}
 					}
 				}
 			})
@@ -333,12 +372,15 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 		}
 		select {
 		case <-ctxCh:
+			b.debug(debugLabel, "context cancelled, stopping dispatching worker")
 			b.Stop()
 			ctxCh = nil
 		case dispatch, more := <-events.C:
 			if !more {
+				b.debug(debugLabel, "dispatch queue closed, stopping dispatching worker")
 				return
 			}
+			b.debug(debugLabel, "received event for dispatching with event ", dispatch.event, "and params:", dispatch.params)
 			syncx.RLockFunc(&b.mux, func() {
 				defer func() {
 					// If a result has already been returned or a result is not requested, then this does nothing
@@ -349,8 +391,8 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 				handlers := b.handledEvents[dispatch.event]
 				noHandlersMessage := fmt.Errorf("%w for event %d", ErrNoHandler, dispatch.event)
 
-				// None found
 				if len(handlers) == 0 {
+					b.debug(debugLabel, "no handlers found for event")
 					// Check if this is already an EventAsyncError
 					if dispatch.event != EventAsyncError {
 						dispatch.future.Resolve(noHandlersMessage)
@@ -361,13 +403,15 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 
 				// Dispatch to all relevant handlers
 				for id := range handlers {
+					b.debug(debugLabel, "dispatching event to handler:", id)
 					handler := b.handlers[id]
 					if handler == nil {
+						b.debug(debugLabel, "Handler no longer found! This is likely a bug in EventBus. Handler ID:", id)
 						continue
 					}
 					err := handler.HandleEvent(dispatch.event, dispatch.params...)
 					if err != nil {
-						// Return first error
+						b.debug("handler", id, "returned error:", err)
 						dispatch.future.Resolve(err)
 						errs = append(errs, fmt.Errorf("handler '%s' failed to handle event %d: %v", id, dispatch.event, err))
 					}
@@ -381,6 +425,7 @@ func (b *EventBus) start(ctx context.Context, events *queue.ChannelQueue[*busDis
 // To ensure that processing stops, call [EventBus.AwaitStop].
 // This is safe to call multiple times from multiple goroutines if needed.
 func (b *EventBus) Stop() {
+	b.debug("EventBus.Stop called")
 	b.stopDispatch.Do(func() {
 		b.events.Stop()
 	})
@@ -390,6 +435,7 @@ func (b *EventBus) Stop() {
 // The given timeout value will be used to set a deadline for stopping.
 // Calling this when the [EventBus] is already stopped will return immediately.
 func (b *EventBus) AwaitStop(timeout time.Duration) {
+	b.debug("EventBus.AwaitStop called")
 	b.Stop()
 	b.Await(timeout)
 }
@@ -398,10 +444,11 @@ func (b *EventBus) AwaitStop(timeout time.Duration) {
 // This can be useful when all logic in an application is made up of handlers and goroutines, and there is no blocking operation to prevent immediately exiting.
 // If no timeout is specified, then this call will block until the start context is cancelled and all goroutines have exited.
 func (b *EventBus) Await(timeout ...time.Duration) {
+	b.debug("EventBus.Await called")
 	b.events.Await()
-	var _timeout time.Duration
 	if len(timeout) > 0 && timeout[0] > 0 {
-		_timeout = timeout[0]
+		_timeout := timeout[0]
+		b.debug("awaiting shutdown with timeout:", _timeout.String())
 		wait, cancel := context.WithTimeout(context.Background(), _timeout)
 		go func() {
 			defer cancel()
@@ -409,6 +456,8 @@ func (b *EventBus) Await(timeout ...time.Duration) {
 		}()
 		<-wait.Done()
 	} else {
+		b.debug("awaiting shutdown with no timeout")
 		b.doneDispatching.Wait()
 	}
+	b.debug("done shutting down")
 }
