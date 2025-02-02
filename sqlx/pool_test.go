@@ -61,3 +61,22 @@ func TestConnPool_Return(t *testing.T) {
 	assert.True(t, conn.closed.Load())
 	assert.NoError(t, pool.Close())
 }
+
+func TestNewConnectionPool_MinStarted(t *testing.T) {
+	pool, err := NewConnectionPool[*mockConn](context.TODO(), newMockConn, 1,
+		OptIdleBehavior(100*time.Millisecond, 75*time.Millisecond),
+		OptMinConnections(3),
+	)
+	assert.ErrorIs(t, err, ErrConfig)
+	assert.Nil(t, pool)
+
+	pool, err = NewConnectionPool[*mockConn](context.TODO(), newMockConn, 3,
+		OptIdleBehavior(100*time.Millisecond, 75*time.Millisecond),
+		OptMinConnections(3),
+	)
+	assert.NoError(t, err)
+	assert.NotNil(t, pool)
+	assert.Len(t, pool.conns, 3)
+
+	assert.NoError(t, pool.Close())
+}
