@@ -125,6 +125,9 @@ func NewConnectionPool[T Connection](ctx context.Context, factory func() (T, err
 			return nil, err
 		}
 	}
+	if conf.minConns > conf.maxConns {
+		return nil, confErrf("minimum connections %d cannot be greater than max connections %d", conf.minConns, conf.maxConns)
+	}
 	pool := &Pool[T]{
 		conf:    *conf,
 		conns:   make([]*poolConn[T], conf.maxConns),
@@ -132,6 +135,14 @@ func NewConnectionPool[T Connection](ctx context.Context, factory func() (T, err
 	}
 	pool.doneMonitoring.Add(1)
 	go pool.idleMonitor()
+	for i := 0; i < conf.minConns; i++ {
+		conn, err := factory()
+		if err != nil {
+			closeErr := pool.Close()
+			return nil, errors.Join(err, closeErr)
+		}
+		pool.Release(conn)
+	}
 	return pool, nil
 }
 
