@@ -44,6 +44,7 @@ var ExtensionMapping = map[string]string{
 	".png":    "image/png",
 	".jpeg":   "image/jpeg",
 	".jpg":    "image/jpeg",
+	".svg":    "image/svg+xml",
 	"default": "application/octet-stream",
 }
 
@@ -59,14 +60,14 @@ func ContentByExtension(filename string, data io.Reader) http.HandlerFunc {
 // EmbeddedHandler will serve content from an [embed.FS], and try to resolve the content type using the file extension.
 // A trim path may be specified, which will trim the prefix from the request path to construct a valid reference within the FS.
 // An append prefix may also be added to allow using a different handler prefix than what would normally be expected to reference files in the FS.
-func EmbeddedHandler(fs *embed.FS, trimPrefix string, appendPrefix string) http.HandlerFunc {
+func EmbeddedHandler(fs embed.FS, trimPrefix string, appendPrefix string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		searchPath := r.URL.Path
 		if len(trimPrefix) > 0 {
 			searchPath = strings.TrimPrefix(searchPath, trimPrefix)
 		}
 		if len(appendPrefix) > 0 {
-			searchPath = filepath.ToSlash(appendPrefix) + "/" + searchPath
+			searchPath = filepath.ToSlash(filepath.Join(appendPrefix, searchPath))
 		}
 		searchPath = strings.TrimPrefix(searchPath, "/")
 		f, err := fs.Open(searchPath)
@@ -81,7 +82,7 @@ func EmbeddedHandler(fs *embed.FS, trimPrefix string, appendPrefix string) http.
 		defer func() {
 			_ = f.Close()
 		}()
-		contentType, ok := ExtensionMapping[searchPath]
+		contentType, ok := ExtensionMapping[filepath.Ext(searchPath)]
 		if !ok {
 			contentType = ExtensionMapping["default"]
 		}
