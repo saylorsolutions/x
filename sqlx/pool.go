@@ -360,7 +360,14 @@ func (p *Pool[T]) acquireExisting() (T, bool) {
 	defer p.mux.Unlock()
 	var mt T
 
-	conn, ok := p.available().Values().First()
+	conn, ok := p.available().FilterValues(func(slot *poolConn[T]) bool {
+		err := p.keepAlive(slot.conn)
+		if err != nil {
+			p.debug("existing connection is not serviceable:", err)
+			return false
+		}
+		return true
+	}).Values().First()
 	if ok {
 		conn.state = stateLeased
 		p.debug("existing connection available for leasing")
@@ -421,6 +428,7 @@ func (p *Pool[T]) Release(conn T) {
 	if err := p.conf.ctx.Err(); err != nil {
 		p.debug("context cancelled, closing connection to be released")
 		_ = conn.Close()
+		return
 	}
 	p.mux.Lock()
 	defer p.mux.Unlock()
@@ -435,17 +443,26 @@ func (p *Pool[T]) release(conn T) {
 	}
 
 	idleDeadline := time.Now().Add(p.conf.idleTimeout)
-	val, ok := p.connections().FilterValues(func(slot *poolConn[T]) bool {
+	idx, val, ok := p.connections().FilterValues(func(slot *poolConn[T]) bool {
 		return slot != nil && slot.state == stateLeased && slot.conn == conn
-	}).Values().First()
+	}).First()
 	if ok {
+		if err := p.keepAlive(conn); err != nil {
+			p.debug("released connection is not serviceable:", err)
+			p.conns[idx] = nil
+			return
+		}
 		p.debug("returning connection to existing slot")
 		val.state = stateAvailable
 		val.idleDeadline = idleDeadline
 		return
 	}
+	if err := p.keepAlive(conn); err != nil {
+		p.debug("released connection is not serviceable:", err)
+		return
+	}
 
-	idx, ok := p.connections().FilterValues(func(slot *poolConn[T]) bool {
+	idx, ok = p.connections().FilterValues(func(slot *poolConn[T]) bool {
 		return slot == nil
 	}).Keys().First()
 	if !ok {

@@ -22,6 +22,7 @@ type Request struct {
 	headers http.Header
 	ctx     context.Context
 	client  *http.Client
+	preSend []func(r *http.Request) error
 }
 
 func requestInit(u string) *Request {
@@ -39,6 +40,7 @@ func requestInit(u string) *Request {
 func NewRequest(method, url string) *Request {
 	r := requestInit(url)
 	r.method = method
+	r.client = http.DefaultClient
 	return r
 }
 
@@ -122,6 +124,20 @@ func (r *Request) AddQueryParams(param, value string) *Request {
 	return r
 }
 
+func (r *Request) SetCookie(cookie *http.Cookie) *Request {
+	if r.err != nil {
+		return r
+	}
+	r.preSend = append(r.preSend, func(req *http.Request) error {
+		if cookie == nil {
+			return errors.New("nil cookie")
+		}
+		req.AddCookie(cookie)
+		return nil
+	})
+	return r
+}
+
 func (r *Request) Body(body io.Reader) *Request {
 	r.mux.Lock()
 	defer r.mux.Unlock()
@@ -170,6 +186,14 @@ func (r *Request) StdRequest() (*http.Request, error) {
 		return nil, err
 	}
 	req.Header = r.headers
+	for _, preSend := range r.preSend {
+		if preSend == nil {
+			panic("nil preSend function")
+		}
+		if err := preSend(req); err != nil {
+			return nil, err
+		}
+	}
 	return req, nil
 }
 

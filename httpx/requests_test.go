@@ -229,3 +229,25 @@ func TestRequestAuth(t *testing.T) {
 		assert.True(t, bearerAuth, "Should have capture bearer auth credentials")
 	})
 }
+
+func TestRequest_SetCookie(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /cookie", func(w http.ResponseWriter, r *http.Request) {
+		cookies := r.Cookies()
+		require.Len(t, cookies, 1)
+		assert.Equal(t, "cookie value", cookies[0].Value)
+		assert.Equal(t, "TestCookie", cookies[0].Name)
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	_, status, err := GetRequest(srv.URL + "/cookie").SetCookie(&http.Cookie{
+		Name:     "TestCookie",
+		Value:    "cookie value",
+		Path:     "/",
+		Secure:   true,
+		HttpOnly: true,
+	}).Send()
+	assert.NoError(t, err)
+	assert.Equal(t, 200, status)
+}
