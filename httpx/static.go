@@ -39,6 +39,7 @@ func HTMLHandler(data io.Reader) http.HandlerFunc {
 var ExtensionMapping = map[string]string{
 	".css":    "text/css",
 	".js":     "text/javascript",
+	".mjs":    "text/javascript",
 	".html":   "text/html",
 	".htm":    "text/html",
 	".png":    "image/png",
