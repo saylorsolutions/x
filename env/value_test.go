@@ -8,6 +8,18 @@ import (
 	"time"
 )
 
+func tempSet(t *testing.T, key, val string) func() {
+	curVal, isSet := os.LookupEnv(key)
+	assert.NoError(t, os.Setenv(key, val))
+	return func() {
+		if isSet {
+			assert.NoError(t, os.Setenv(key, curVal))
+			return
+		}
+		assert.NoError(t, os.Unsetenv(key))
+	}
+}
+
 func TestVal(t *testing.T) {
 	const key = "TEST_VAL"
 
@@ -38,7 +50,7 @@ func TestVal(t *testing.T) {
 		name := tc.name
 		t.Run(name, func(t *testing.T) {
 			if !tc.unset {
-				assert.NoError(t, os.Setenv(key, tc.value))
+				defer tempSet(t, key, tc.value)()
 			}
 			result := Val(key, "default")
 			assert.Equal(t, tc.expected, result)
@@ -51,7 +63,7 @@ func TestBoolIf_EmptyTranslation(t *testing.T) {
 		key        = "TEST_BOOLIF_EMPTY"
 		defaultVal = true
 	)
-	assert.NoError(t, os.Setenv(key, "true"))
+	defer tempSet(t, key, "true")()
 	assert.NotPanics(t, func() {
 		got := BoolIf(key, defaultVal, nil)
 		assert.Equal(t, defaultVal, got)
@@ -107,7 +119,7 @@ func TestBool(t *testing.T) {
 		name := tc.name
 		t.Run(name, func(t *testing.T) {
 			if !tc.unset {
-				assert.NoError(t, os.Setenv(key, tc.value))
+				defer tempSet(t, key, tc.value)()
 			}
 			assert.Equal(t, tc.expected, Bool(key, false))
 		})
@@ -161,7 +173,7 @@ func TestInt(t *testing.T) {
 		name := tc.name
 		t.Run(name, func(t *testing.T) {
 			if !tc.unset {
-				assert.NoError(t, os.Setenv(key, tc.value))
+				defer tempSet(t, key, tc.value)()
 			}
 			assert.Equal(t, tc.expected, Int(key, defaultVal))
 		})
@@ -221,7 +233,7 @@ func TestFloat(t *testing.T) {
 		name := tc.name
 		t.Run(name, func(t *testing.T) {
 			if !tc.unset {
-				assert.NoError(t, os.Setenv(key, tc.value))
+				defer tempSet(t, key, tc.value)()
 			}
 			assert.Equal(t, tc.expected, Float(key, defaultVal))
 		})
@@ -275,9 +287,39 @@ func TestDuration(t *testing.T) {
 		name := tc.name
 		t.Run(name, func(t *testing.T) {
 			if !tc.unset {
-				assert.NoError(t, os.Setenv(key, tc.value))
+				defer tempSet(t, key, tc.value)()
 			}
 			assert.Equal(t, tc.expected, Duration(key, defaultVal))
 		})
 	}
+}
+
+func TestInterpretSlice(t *testing.T) {
+	const key = "SOME_ENV_VAL"
+
+	t.Run("String slice", func(t *testing.T) {
+		defer tempSet(t, key, "a:b:c:")()
+		vals := ValSlice(key, ":", "d")
+		assert.Equal(t, []string{"a", "b", "c", "d"}, vals)
+	})
+	t.Run("Bool slice", func(t *testing.T) {
+		defer tempSet(t, key, "true,blue,1,off,")()
+		vals := BoolSlice(key, ",", false)
+		assert.Equal(t, []bool{true, false, true, false, false}, vals)
+	})
+	t.Run("Int slice", func(t *testing.T) {
+		defer tempSet(t, key, ";1;2;77;abc")()
+		vals := IntSlice(key, ";", -1)
+		assert.Equal(t, []int64{-1, 1, 2, 77, -1}, vals)
+	})
+	t.Run("Float slice", func(t *testing.T) {
+		defer tempSet(t, key, "-1-2.0-0.77-abc")()
+		vals := FloatSlice(key, "-", -2.0)
+		assert.Equal(t, []float64{-2.0, 1, 2, 0.77, -2.0}, vals)
+	})
+	t.Run("Duration slice", func(t *testing.T) {
+		defer tempSet(t, key, "|1m|2s|77s|abc")()
+		vals := DurationSlice(key, "|", 0)
+		assert.Equal(t, []time.Duration{0, time.Minute, 2 * time.Second, 77 * time.Second, 0}, vals)
+	})
 }
