@@ -34,10 +34,16 @@ func (r *Request) Send() (*Response, int, error) {
 }
 
 func (r *Response) Close() error {
+	if r == nil {
+		return nil
+	}
 	r.mux.Lock()
 	defer r.mux.Unlock()
 	r.hasRead = true
-	return r.resp.Body.Close()
+	if r.resp != nil {
+		return r.resp.Body.Close()
+	}
+	return nil
 }
 
 func (r *Response) Body() (io.ReadCloser, error) {

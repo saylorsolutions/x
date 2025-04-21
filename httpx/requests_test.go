@@ -251,3 +251,24 @@ func TestRequest_SetCookie(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 200, status)
 }
+
+func TestRequest_JSONBody(t *testing.T) {
+	mux := http.NewServeMux()
+	mux.HandleFunc("POST /json", func(w http.ResponseWriter, r *http.Request) {
+		req := map[string]any{}
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error("Unexpected error decoding JSON:", err)
+		}
+		assert.Equal(t, "payload", req["payload"])
+	})
+	srv := httptest.NewServer(mux)
+	defer srv.Close()
+
+	resp, status, err := PostRequest(srv.URL + "/json").
+		JSONBody(map[string]any{
+			"payload": "payload",
+		}).Send()
+	_ = resp.Close()
+	assert.NoError(t, err)
+	assert.Equal(t, 200, status)
+}

@@ -3,6 +3,7 @@ package sqlx
 import (
 	"context"
 	"database/sql"
+	"errors"
 )
 
 // Beginner is any type that can begin a transaction.
@@ -16,7 +17,7 @@ type Beginner interface {
 // The first error returned in the process will be propagated to the caller.
 func WithTx(tx *sql.Tx, do func(tx *sql.Tx) error) error {
 	if err := do(tx); err != nil {
-		return tx.Rollback()
+		return errors.Join(err, tx.Rollback())
 	}
 	return tx.Commit()
 }

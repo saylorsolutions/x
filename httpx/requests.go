@@ -32,7 +32,7 @@ func requestInit(u string) *Request {
 	}
 	return &Request{
 		u:       _url,
-		headers: map[string][]string{},
+		headers: http.Header{},
 		client:  http.DefaultClient,
 	}
 }
@@ -75,13 +75,6 @@ func DeleteRequest(u string) *Request {
 	return NewRequest(http.MethodDelete, u)
 }
 
-func (r *Request) SetHeader(header, value string) *Request {
-	r.mux.Lock()
-	defer r.mux.Unlock()
-	r.headers.Set(header, value)
-	return r
-}
-
 func (r *Request) WithContext(ctx context.Context) *Request {
 	r.mux.Lock()
 	defer r.mux.Unlock()
@@ -92,11 +85,27 @@ func (r *Request) WithContext(ctx context.Context) *Request {
 	return r
 }
 
+func (r *Request) SetHeader(header, value string) *Request {
+	r.mux.Lock()
+	defer r.mux.Unlock()
+	if r.err != nil {
+		return r
+	}
+	if r.headers == nil {
+		r.headers = http.Header{}
+	}
+	r.headers.Set(header, value)
+	return r
+}
+
 func (r *Request) AddHeader(header, value string) *Request {
 	r.mux.Lock()
 	defer r.mux.Unlock()
 	if r.err != nil {
 		return r
+	}
+	if r.headers == nil {
+		r.headers = http.Header{}
 	}
 	r.headers.Add(header, value)
 	return r
