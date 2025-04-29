@@ -61,5 +61,6 @@ func (p *Printer) PromptNoEcho(msg string, args ...any) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from terminal: %w", err)
 	}
+	p.Println()
 	return line, nil
 }
