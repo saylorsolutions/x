@@ -18,7 +18,7 @@ var (
 )
 
 // CommandFunc is a function that may be executed within a [Command].
-type CommandFunc = func(flags *flag.FlagSet, printer *Printer) error
+type CommandFunc = func(flags *flag.FlagSet, out *Printer) error
 
 // Command is an executable function in a CLI.
 // It should be linked to a [CommandSet] to establish a tree of commands available to the user.
