@@ -7,6 +7,8 @@ import (
 )
 
 // SignalCtx will set up a context that will be cancelled if any of the given signals are received.
+//
+// Deprecated: Use signal.NotifyContext instead.
 func SignalCtx(parent context.Context, signals ...os.Signal) context.Context {
 	if len(signals) == 0 {
 		panic("no signals passed to SignalContext")
