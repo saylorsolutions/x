@@ -92,6 +92,17 @@ func (r *Response) GetHeader(header string) (string, bool) {
 	return val, len(val) > 0
 }
 
+func (r *Response) JSONBody(target any) error {
+	body, err := r.Body()
+	if err != nil {
+		return err
+	}
+	defer func() {
+		_ = body.Close()
+	}()
+	return json.NewDecoder(body).Decode(target)
+}
+
 func (r *Response) StdResponse() *http.Response {
 	return r.resp
 }
