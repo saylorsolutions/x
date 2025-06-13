@@ -6,6 +6,12 @@ type PanicHandler interface {
 	Handle(r any)
 }
 
+type PanicHandlerFunc func(r any)
+
+func (fn PanicHandlerFunc) Handle(r any) {
+	fn(r)
+}
+
 func RecoveryMiddleware(handler PanicHandler) Middleware {
 	if handler == nil {
 		panic("nil panic handler")
