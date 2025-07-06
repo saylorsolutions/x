@@ -1,6 +1,7 @@
 package iterx
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
@@ -31,7 +32,7 @@ func TestTableMetadata_FilterColumns(t *testing.T) {
 	for name, tc := range tests {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			result := SelectTable(table).FilterColumns(SkipColumns[int](tc.excluded)).Table()
+			result := SelectTable(table).SkipColumns(tc.excluded).Table()
 			assert.Equal(t, tc.expected, result)
 		})
 	}
@@ -64,8 +65,12 @@ func TestTableMetadata_FilterRows(t *testing.T) {
 	for name, tc := range tests {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
-			result := SelectTable(table).FilterRows(SkipRows[int](tc.excluded)).Table()
+			filtered := SelectTable(table).FilterRows(SkipRows[int](tc.excluded))
+			result := filtered.Table()
+			width, height := filtered.Dimensions()
 			assert.Equal(t, tc.expected, result)
+			assert.Equal(t, 2, height)
+			assert.Equal(t, 1, width)
 		})
 	}
 }
@@ -93,7 +98,7 @@ func TestTransformRows(t *testing.T) {
 			age:  age,
 		}
 	}
-	rows := TransformRows(table.FilterColumns(SkipColumns[string](2)), transform)
+	rows := TransformRows(table.SkipColumns(2), transform)
 	assert.Equal(t, 2, rows.Count())
 	assert.Equal(t, []int{0, 1}, rows.Keys().Slice())
 	rows.ForEach(func(row int, val transformedRow) bool {
@@ -135,7 +140,7 @@ func TestTransformLabeledTable(t *testing.T) {
 			age:  age,
 		}
 	}
-	rows := TransformLabeledRows(table.FilterColumns(SkipColumns[string](2)), []string{"name", "age", "desc"}, transform)
+	rows := TransformLabeledRows(table.SkipColumns(2), []string{"name", "age", "desc"}, transform)
 	assert.Equal(t, 2, rows.Count())
 	assert.Equal(t, []int{0, 1}, rows.Keys().Slice())
 	rows.ForEach(func(row int, val transformedRow) bool {
@@ -191,20 +196,77 @@ func TestTableIterator_RotateTable(t *testing.T) {
 }
 
 func TestSelectTable_PanicOnDifferentRowWidths(t *testing.T) {
-	assert.Panics(t, func() {
-		SelectTable([][]int{
-			{0, 1, 2},
-			{0, 1},
-			{0, 1, 2},
+	t.Run("Expanded first row", func(t *testing.T) {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					assert.Contains(t, fmt.Sprintf("%v", r), "1")
+				} else {
+					t.Error("should have panicked")
+				}
+			}()
+			SelectTable([][]int{
+				{0, 1, 2},
+				{0, 1},
+				{0, 1},
+			})
+		}()
+	})
+	t.Run("Expanded middle row", func(t *testing.T) {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					assert.Contains(t, fmt.Sprintf("%v", r), "1")
+				} else {
+					t.Error("should have panicked")
+				}
+			}()
+			SelectTable([][]int{
+				{0, 1},
+				{0, 1, 2},
+				{0, 1},
+			})
+		}()
+	})
+	t.Run("Expanded last row", func(t *testing.T) {
+		func() {
+			defer func() {
+				if r := recover(); r != nil {
+					assert.Contains(t, fmt.Sprintf("%v", r), "last")
+				} else {
+					t.Error("should have panicked")
+				}
+			}()
+			SelectTable([][]int{
+				{0, 1},
+				{0, 1},
+				{0, 1, 2},
+			})
+		}()
+	})
+	t.Run("Balanced table", func(t *testing.T) {
+		assert.NotPanics(t, func() {
+			width, height := SelectTable([][]int{
+				{0, 1},
+				{0, 1},
+				{0, 1},
+			}).Dimensions()
+			assert.Equal(t, 2, width)
+			assert.Equal(t, 3, height)
 		})
 	})
-	assert.NotPanics(t, func() {
-		width, height := SelectTable([][]int{
-			{0, 1},
-			{0, 1},
-			{0, 1},
-		}).Dimensions()
-		assert.Equal(t, 2, width)
-		assert.Equal(t, 3, height)
-	})
+}
+
+func TestFilterColumnValue(t *testing.T) {
+	result := SelectTable([][]int{
+		{0, 1, 0},
+		{1, 0, 0},
+		{0, 1, 0},
+	}).FilterRows(FilterColumnValue[int](1, NoZeroValues[int]())).
+		Table()
+	expected := [][]int{
+		{0, 1, 0},
+		{0, 1, 0},
+	}
+	assert.Equal(t, expected, result)
 }
