@@ -4,7 +4,6 @@ package iterx
 type Filter[T any] func(T) bool
 
 // NoZeroValues creates a [Filter] that excludes elements that are the zero value for the type.
-// The underlying type must be comparable.
 func NoZeroValues[T comparable]() Filter[T] {
 	var mt T
 	return func(val T) bool {
@@ -12,8 +11,14 @@ func NoZeroValues[T comparable]() Filter[T] {
 	}
 }
 
+// Equal creates a [Filter] that includes elements that equal the value.
+func Equal[T comparable](expected T) Filter[T] {
+	return func(val T) bool {
+		return val == expected
+	}
+}
+
 // NotEqual creates a [Filter] that excludes elements that equal the value.
-// The underlying type must be comparable.
 func NotEqual[T comparable](val T) Filter[T] {
 	return func(el T) bool {
 		return el != val
@@ -22,6 +27,9 @@ func NotEqual[T comparable](val T) Filter[T] {
 
 // And combines multiple [Filter] into one, where both must be true to yield the element.
 func (f Filter[T]) And(other Filter[T]) Filter[T] {
+	if other == nil {
+		return f
+	}
 	return func(element T) bool {
 		if f(element) && other(element) {
 			return true
@@ -32,6 +40,9 @@ func (f Filter[T]) And(other Filter[T]) Filter[T] {
 
 // Or combines multiple [Filter] into one, where one or the other must be true to yield the element.
 func (f Filter[T]) Or(other Filter[T]) Filter[T] {
+	if other == nil {
+		return f
+	}
 	return func(element T) bool {
 		if f(element) || other(element) {
 			return true
@@ -51,5 +62,11 @@ func Any[T any]() Filter[T] {
 func None[T any]() Filter[T] {
 	return func(_ T) bool {
 		return false
+	}
+}
+
+func Invert[T any](filter Filter[T]) Filter[T] {
+	return func(val T) bool {
+		return !filter(val)
 	}
 }
