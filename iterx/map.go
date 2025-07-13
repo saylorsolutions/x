@@ -44,18 +44,9 @@ func SliceMap[T any](slice []T) MapIter[int, T] {
 // If there are duplicate elements in the slice, then the index of the first duplicate value will be retained.
 // This is to ensure that keys are still unique to satisfy normal map semantics.
 func SliceInverseMap[T comparable](slice []T) MapIter[T, int] {
-	return func(yield func(T, int) bool) {
-		seen := map[T]bool{}
-		for idx, val := range slice {
-			if seen[val] {
-				continue
-			}
-			seen[val] = true
-			if !yield(val, idx) {
-				return
-			}
-		}
-	}
+	return TransformEntries(Select(slice).WithIndex(), func(key int, val T) (T, int) {
+		return val, key
+	})
 }
 
 // SliceSet will create a [MapIter] with all distinct values in the given slice.
@@ -246,6 +237,16 @@ func (i MapIter[K, V]) Last() (lastKey K, lastVal V, found bool) {
 func (i MapIter[K, V]) HasKey(key K) (result bool) {
 	_, _, ok := i.FilterKeys(Equal(key)).First()
 	return ok
+}
+
+func TransformEntries[K1 comparable, K2 comparable, V1 any, V2 any](input MapIter[K1, V1], transform func(key K1, val V1) (K2, V2)) MapIter[K2, V2] {
+	return DedupeKeys[K2, V2](
+		func(yield func(K2, V2) bool) {
+			input.ForEach(func(key K1, val V1) bool {
+				return yield(transform(key, val))
+			})
+		},
+	)
 }
 
 func TransformKeys[K1 comparable, K2 comparable, V any](iter MapIter[K1, V], transform func(key K1) K2) MapIter[K2, V] {

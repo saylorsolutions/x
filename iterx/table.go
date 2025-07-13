@@ -133,6 +133,10 @@ func (i TableIter[T]) SelectColumns(columns ...int) TableIter[T] {
 	}
 }
 
+func (i TableIter[T]) ForEach(handler func(row int, col int, value T) bool) {
+	i(handler)
+}
+
 func (i TableIter[T]) RowOffset(offset int) TableIter[T] {
 	return func(yield func(row int, col int, value T) bool) {
 		var numOffset int
@@ -243,6 +247,91 @@ func (i TableIter[T]) AppendColumn(colValue func(row MapIter[int, T]) T) TableIt
 			return
 		}
 		yield(lastRow, lastCol+1, colValue(prevColVals))
+	}
+}
+
+func mustExist[T any](val T, ok bool) T {
+	if !ok {
+		panic("must exist")
+	}
+	return val
+}
+
+// Joiner is a function that returns whether two rows in two TableIter should be joined together.
+type Joiner[T any] func(baseRow MapIter[int, T], joinRow MapIter[int, T]) bool
+
+func (j Joiner[T]) And(other Joiner[T]) Joiner[T] {
+	return func(baseRow MapIter[int, T], joinRow MapIter[int, T]) bool {
+		if !j(baseRow, joinRow) {
+			return false
+		}
+		return other(baseRow, joinRow)
+	}
+}
+
+func (j Joiner[T]) Or(other Joiner[T]) Joiner[T] {
+	return func(baseRow MapIter[int, T], joinRow MapIter[int, T]) bool {
+		if j(baseRow, joinRow) {
+			return true
+		}
+		return other(baseRow, joinRow)
+	}
+}
+
+// CompareColumns creates a Joiner comparing two columns in the given rows.
+// Column number parameters should reflect original column numbers.
+func CompareColumns[T comparable](baseCol int, joinCol int, compare func(a, b T) bool) Joiner[T] {
+	return func(baseRow MapIter[int, T], joinRow MapIter[int, T]) bool {
+		_, baseVal, ok := baseRow.FilterKeys(func(i int) bool {
+			return i == baseCol
+		}).First()
+		if !ok {
+			return false
+		}
+		_, joinVal, ok := joinRow.FilterKeys(func(i int) bool {
+			return i == joinCol
+		}).First()
+		if !ok {
+			return false
+		}
+		return compare(baseVal, joinVal)
+	}
+}
+
+// JoinTable will join two TableIter where the given joiner function returns true.
+// Original row numbers will not be retained, and joined column numbers will be offset to be after the max column number of the base row.
+//
+// If the base table has no rows, then an empty TableIter will be returned.
+// If the join table has no rows, then the base table will be returned.
+func JoinTable[T any](base TableIter[T], joinTable TableIter[T], joiner Joiner[T]) TableIter[T] {
+	noRows := TableIter[T](func(yield func(row int, col int, value T) bool) {})
+	baseRows := base.Rows().Values()
+	joinRows := joinTable.Rows().Values()
+	if baseRows.Count() == 0 {
+		return noRows
+	}
+	if joinRows.Count() == 0 {
+		return base
+	}
+	colNumOffset := Max(mustExist(baseRows.First()).Keys()) + 1
+	return func(yield func(row int, col int, value T) bool) {
+		rowNum := -1
+		baseRows.ForEach(func(baseRow MapIter[int, T]) bool {
+			doNext := true
+			joinRows.ForEach(func(joinRow MapIter[int, T]) bool {
+				if joiner(baseRow, joinRow) {
+					rowNum++
+					baseRow.Append(TransformKeys(joinRow, func(key int) int {
+						return key + colNumOffset
+					})).ForEach(func(col int, val T) bool {
+						doNext = yield(rowNum, col, val)
+						return doNext
+					})
+				}
+				return doNext
+			})
+			return doNext
+		})
 	}
 }
 

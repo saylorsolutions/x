@@ -4,12 +4,6 @@ import "iter"
 
 type SliceIter[T any] iter.Seq[T]
 
-// SelectAll will translate any slice into a [SliceIter].
-// Deprecated: use Select with no filters instead.
-func SelectAll[T any](slice []T) SliceIter[T] {
-	return Select(slice)
-}
-
 func SelectValue[T any](value T) SliceIter[T] {
 	return func(yield func(T) bool) {
 		yield(value)
@@ -194,13 +188,13 @@ func TransformSlice[A any, B any](iter SliceIter[A], transform func(in A) B) Sli
 
 // TransformSliceToMap will transform any slice into a MapIter using the transform function.
 // Resulting map keys will be deduplicated.
-func TransformSliceToMap[T any, K comparable, V any](slice []T, transform func(val T) (K, V)) MapIter[K, V] {
+func TransformSliceToMap[T any, K comparable, V any](slice []T, transform func(index int, val T) (K, V)) MapIter[K, V] {
 	if len(slice) == 0 {
 		return func(yield func(K, V) bool) {}
 	}
 	return DedupeKeys(func(yield func(K, V) bool) {
-		for _, val := range slice {
-			if !yield(transform(val)) {
+		for i, val := range slice {
+			if !yield(transform(i, val)) {
 				return
 			}
 		}

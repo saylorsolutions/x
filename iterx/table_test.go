@@ -270,3 +270,33 @@ func TestFilterColumnValue(t *testing.T) {
 	}
 	assert.Equal(t, expected, result)
 }
+
+func TestJoinTable(t *testing.T) {
+	a := SelectTable([][]int{
+		{0, 1, 2},
+		{3, 4, 5},
+		{6, 7, 8},
+	})
+	b := SelectTable([][]int{
+		{0, 2, 4},
+		{3, 8, 10},
+		{6, 14, 16},
+	})
+
+	joiner := CompareColumns(0, 2, func(a, b int) bool {
+		return a == b-1
+	}).Or(CompareColumns(0, 2, func(a, b int) bool {
+		return b == a+10
+	}))
+	result := JoinTable(a, b, joiner)
+	expected := [][]int{
+		{0, 1, 2, 3, 8, 10},
+		{3, 4, 5, 0, 2, 4},
+		{6, 7, 8, 6, 14, 16},
+	}
+	assert.Equal(t, expected, result.Table())
+	result(func(row int, col int, value int) bool {
+		assert.Equal(t, expected[row][col], value)
+		return true
+	})
+}
