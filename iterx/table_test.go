@@ -300,3 +300,33 @@ func TestJoinTable(t *testing.T) {
 		return true
 	})
 }
+
+func TestTable_OffsetLimit(t *testing.T) {
+	table := make([][]int, 1000)
+	for i := 0; i < 1000; i++ {
+		table[i] = make([]int, 3)
+		for j := 0; j < 3; j++ {
+			table[i][j] = j + i*3
+		}
+	}
+
+	tableSel := SelectTable(table)
+	t.Run("Offset 100, no limit", func(t *testing.T) {
+		assert.Equal(t, 900, tableSel.RowOffset(100).Rows().Count())
+	})
+	t.Run("Offset 200, no limit", func(t *testing.T) {
+		assert.Equal(t, 800, tableSel.RowOffset(200).Rows().Count())
+	})
+	t.Run("Offset 100, limit 100", func(t *testing.T) {
+		assert.Equal(t, 100, tableSel.RowOffset(100).RowLimit(100).Rows().Count())
+	})
+	t.Run("No offset, limit 100", func(t *testing.T) {
+		assert.Equal(t, 100, tableSel.RowLimit(100).Rows().Count())
+	})
+	t.Run("Offset 200, limit 200", func(t *testing.T) {
+		assert.Equal(t, 200, tableSel.RowOffset(200).RowLimit(200).Rows().Count())
+	})
+	t.Run("Offset 900, limit 200", func(t *testing.T) {
+		assert.Equal(t, 100, tableSel.RowOffset(900).RowLimit(200).Rows().Count())
+	})
+}

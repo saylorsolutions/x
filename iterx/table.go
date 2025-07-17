@@ -139,10 +139,18 @@ func (i TableIter[T]) ForEach(handler func(row int, col int, value T) bool) {
 
 func (i TableIter[T]) RowOffset(offset int) TableIter[T] {
 	return func(yield func(row int, col int, value T) bool) {
-		var numOffset int
+		var (
+			numOffset int
+			lastRow   = -1
+		)
 		i(func(row int, col int, value T) bool {
-			if numOffset >= offset {
-				numOffset++
+			if lastRow != row {
+				if lastRow >= 0 {
+					numOffset++
+				}
+				lastRow = row
+			}
+			if numOffset < offset {
 				return true
 			}
 			return yield(row, col, value)
@@ -152,12 +160,20 @@ func (i TableIter[T]) RowOffset(offset int) TableIter[T] {
 
 func (i TableIter[T]) RowLimit(limit int) TableIter[T] {
 	return func(yield func(row int, col int, value T) bool) {
-		var numSent int
+		var (
+			lastRow = -1
+			numSent int
+		)
 		i(func(row int, col int, value T) bool {
+			if lastRow != row {
+				if lastRow >= 0 {
+					numSent++
+				}
+				lastRow = row
+			}
 			if numSent >= limit {
 				return false
 			}
-			numSent++
 			return yield(row, col, value)
 		})
 	}
