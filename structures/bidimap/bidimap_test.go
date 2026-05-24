@@ -1,9 +1,10 @@
 package bidimap
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestNew(t *testing.T) {
@@ -16,7 +17,7 @@ func TestNew(t *testing.T) {
 func TestBidiMap_Add(t *testing.T) {
 	m := new(BidiMap[int, string])
 
-	assert.Equal(t, "", m.Value(1))
+	assert.Empty(t, m.Value(1))
 
 	m.Add(1, "one")
 	assert.True(t, m.HasValue("one"))

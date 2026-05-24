@@ -3,6 +3,7 @@ package httpx
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -22,12 +23,15 @@ type Response struct {
 
 func (r *Request) Send() (*Response, int, error) {
 	req, err := r.StdRequest()
+	if err != nil {
+		return nil, 0, fmt.Errorf("failed to create standard request: %w", err)
+	}
 	_resp := &Response{
 		req: req,
 	}
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("failed to send request: %w", err)
 	}
 	_resp.resp = resp
 	return _resp, resp.StatusCode, nil

@@ -1,8 +1,10 @@
 package cli
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestMapArgs(t *testing.T) {
@@ -71,12 +73,12 @@ func TestMapArgs(t *testing.T) {
 				assert.ErrorIs(t, err, ErrArgMap)
 				return
 			}
-			assert.NoError(t, err)
-			assert.Equal(t, a, "a")
-			assert.Equal(t, b, "b")
-			assert.Equal(t, c, "c")
+			require.NoError(t, err)
+			assert.Equal(t, "a", a)
+			assert.Equal(t, "b", b)
+			assert.Equal(t, "c", c)
 			if len(tc.args) == 4 && len(tc.targets) == 4 {
-				assert.Equal(t, d, "d")
+				assert.Equal(t, "d", d)
 			}
 		})
 	}

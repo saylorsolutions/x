@@ -46,8 +46,8 @@ func TestVarPattern_Compile_InvalidPattern(t *testing.T) {
 	const invalidPattern = `\b[M]\w+\`
 	vp := NewVarPattern()
 	_, err := vp.Compile(invalidPattern)
-	assert.Error(t, err)
-	assert.Error(t, vp.Define("name", invalidPattern))
+	require.Error(t, err)
+	require.Error(t, vp.Define("name", invalidPattern))
 	assert.Panics(t, func() {
 		vp.MustCompile(invalidPattern)
 	})
@@ -56,7 +56,7 @@ func TestVarPattern_Compile_InvalidPattern(t *testing.T) {
 	})
 	require.NoError(t, vp.Define("name", `\b[M]\w+`))
 	_, err = vp.Compile(`[[:$name:]]\`)
-	assert.Error(t, err)
+	require.Error(t, err)
 }
 
 func TestVarPattern_Compile_NoNameToReplace(t *testing.T) {

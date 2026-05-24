@@ -3,8 +3,10 @@ package cli
 import (
 	"bufio"
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"slices"
 	"strings"
 	"time"
@@ -34,7 +36,15 @@ func (s *CommandSet) RespondInteractive() bool {
 		return false
 	}
 
-	if err := s.interactiveLoop(os.Args[0]); err != nil {
+	possibleExecPath, err := os.Executable()
+	if err != nil {
+		panic(fmt.Errorf("failed to evaluate executable path: %w", err))
+	}
+	execPath, err := filepath.EvalSymlinks(possibleExecPath)
+	if err != nil {
+		panic(fmt.Errorf("failed to check for symlinks in executable path: %w", err))
+	}
+	if err := s.interactiveLoop(execPath); err != nil {
 		s.printer.Println("Error running command interactively:", err)
 	}
 	return true
@@ -53,8 +63,8 @@ func (s *CommandSet) interactiveLoop(command string) error {
 	scanner := bufio.NewScanner(os.Stdin)
 	p := s.printer
 	p.Printf(`Running '%s' interactively. Enter %s to exit.
-Use the %s command with one or more sub-commands to push them to the execution stack, and %s to pop and return.
-`, command, strings.Join(InteractiveQuitCommands, " or "),
+Use the '%s' command with one or more sub-commands to push them to the execution stack, and '%s' to pop and return.
+`, filepath.Base(command), strings.Join(InteractiveQuitCommands, " or "),
 		UseCommand, BackCommand)
 	for {
 		if len(commandStack) > 0 {
@@ -106,7 +116,7 @@ Use the %s command with one or more sub-commands to push them to the execution s
 			err := func() error {
 				timeout, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
 				defer cancel()
-				cmd := exec.CommandContext(timeout, command, segments...)
+				cmd := exec.CommandContext(timeout, command, segments...) //nolint:gosec // This is validated rather than trusting spoofable os.Args[0]
 				cmd.Stdout = p.out
 				cmd.Stderr = p.out
 				return cmd.Run()

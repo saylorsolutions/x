@@ -30,7 +30,6 @@ func listenCtx(ctx context.Context, serveFn func() error, shutdownFn func(contex
 				srvErrs <- err
 			}
 		}
-		return
 	}()
 
 	select {

@@ -3,11 +3,12 @@ package httpsec
 import (
 	"bytes"
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestEnableContentSecurityPolicy(t *testing.T) {
@@ -89,7 +90,7 @@ func TestEnableContentSecurityPolicy(t *testing.T) {
 			defer srv.Close()
 
 			resp, err := http.Get(srv.URL)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			defer func() {
 				_ = resp.Body.Close()
 			}()
@@ -130,8 +131,8 @@ func TestEnableContentSecurityPolicy_Neg(t *testing.T) {
 		tc := tc
 		t.Run(name, func(t *testing.T) {
 			_, err := NewSecurityPolicies(EnableContentSecurityPolicy(tc))
-			assert.Error(t, err)
-			assert.ErrorIs(t, err, ErrContentSecurityConfig)
+			require.Error(t, err)
+			require.ErrorIs(t, err, ErrContentSecurityConfig)
 		})
 	}
 }
@@ -162,7 +163,7 @@ func TestCSPReportHandler(t *testing.T) {
 	})
 	require.NoError(t, err)
 	resp, err := http.Post(srv.URL, CSPReportContentType, bytes.NewReader(body))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	defer func() {
 		_ = resp.Body.Close()
 	}()

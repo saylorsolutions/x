@@ -129,7 +129,9 @@ func (r *Request) AddQueryParams(param, value string) *Request {
 	if r.err != nil {
 		return r
 	}
-	r.u.Query().Add(param, value)
+	vals := r.u.Query()
+	vals.Add(param, value)
+	r.u.RawQuery = vals.Encode()
 	return r
 }
 

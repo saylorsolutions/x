@@ -4,11 +4,13 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 const (
@@ -35,8 +37,8 @@ func TestBufferSize_InvalidInput(t *testing.T) {
 		bufferSize: 1,
 		numWorkers: 1,
 	}
-	assert.Error(t, OptBufferSize(0)(&conf))
-	assert.Error(t, OptBufferSize(-1)(&conf))
+	require.Error(t, OptBufferSize(0)(&conf))
+	require.Error(t, OptBufferSize(-1)(&conf))
 	assert.Equal(t, 1, conf.bufferSize)
 }
 
@@ -45,8 +47,8 @@ func TestNumWorkers_InvalidInput(t *testing.T) {
 		bufferSize: 1,
 		numWorkers: 1,
 	}
-	assert.Error(t, OptNumWorkers(0)(&conf))
-	assert.Error(t, OptNumWorkers(-1)(&conf))
+	require.Error(t, OptNumWorkers(0)(&conf))
+	require.Error(t, OptNumWorkers(-1)(&conf))
 	assert.Equal(t, 1, conf.numWorkers)
 }
 
@@ -69,10 +71,10 @@ func TestEventBus_Dispatch_MissingEvent(t *testing.T) {
 	bus := NewEventBus().Start(context.Background())
 	defer bus.AwaitStop(testShutdownTimeout)
 	err := bus.DispatchResult(testNotHandledEvent).Await(testAwaitTimeout)
-	assert.ErrorIs(t, err, ErrNoHandler, "Should be rejected because there's no handler")
+	require.ErrorIs(t, err, ErrNoHandler, "Should be rejected because there's no handler")
 
 	err = bus.DispatchResult(EventNone, "A message").Await(testAwaitTimeout)
-	assert.ErrorIs(t, err, ErrInvalidEvent, "Should be rejected because an invalid event is used")
+	require.ErrorIs(t, err, ErrInvalidEvent, "Should be rejected because an invalid event is used")
 }
 
 func TestEventBus_DispatchResult(t *testing.T) {
@@ -109,7 +111,7 @@ func TestEventBus_Dispatch_Async(t *testing.T) {
 		counter.Add(1)
 		return nil
 	}))
-	assert.NoError(t, bus.SetHandledExclusive("counter", testEvent))
+	require.NoError(t, bus.SetHandledExclusive("counter", testEvent))
 	bus.RegisterErrorHandler("err-handler", func(err error) {
 		asyncErrs.Add(1)
 		t.Errorf("Should not have received an error: %v", err)
@@ -195,13 +197,13 @@ func TestEventBus_Dispatch_HighVolume(t *testing.T) {
 }
 
 func TestEventBus_DispatchResult_ShuttingDown(t *testing.T) {
-	bus := NewEventBus().Start(nil)
+	bus := NewEventBus().Start(context.Background())
 	bus.RegisterFunc("test-handler", testEvent, func(_ Event, _ ...Param) error {
 		t.Error("Should not have received an event")
 		return nil
 	})
 	bus.Stop()
-	assert.ErrorIs(t, bus.DispatchResult(testEvent).Await(), ErrShuttingDown)
+	require.ErrorIs(t, bus.DispatchResult(testEvent).Await(), ErrShuttingDown)
 }
 
 var _ Handler = (*testHandlerImpl)(nil)

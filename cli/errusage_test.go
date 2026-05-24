@@ -2,27 +2,29 @@ package cli
 
 import (
 	"errors"
-	flag "github.com/spf13/pflag"
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	flag "github.com/spf13/pflag"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestUsageError_Is(t *testing.T) {
 	err := NewUsageError("test")
-	assert.ErrorIs(t, err, &UsageError{})
+	require.ErrorIs(t, err, &UsageError{})
 
 	var ErrTesting = errors.New("test")
 	err2 := NewUsageError("%w", ErrTesting)
-	assert.ErrorIs(t, err2, &UsageError{})
-	assert.ErrorIs(t, err2, ErrTesting)
+	require.ErrorIs(t, err2, &UsageError{})
+	require.ErrorIs(t, err2, ErrTesting)
 }
 
 func TestUsageError_Unwrap(t *testing.T) {
 	var ErrTesting = errors.New("test")
 	err := NewUsageError("%w", ErrTesting)
 	var targetUsage = new(UsageError)
-	assert.True(t, errors.As(err, &targetUsage))
+	require.ErrorAs(t, err, &targetUsage)
 }
 
 func TestUsageError_Error(t *testing.T) {

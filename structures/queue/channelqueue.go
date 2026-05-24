@@ -68,7 +68,7 @@ func NewChannelQueue[T any](ctx context.Context, opts ...ChannelQueueOption) (*C
 	var (
 		cancel context.CancelFunc
 	)
-	ctx, cancel = context.WithCancel(ctx)
+	ctx, cancel = context.WithCancel(ctx) //nolint:gosec // This is called later by Stop.
 	cq := &ChannelQueue[T]{
 		ctx:     ctx,
 		stop:    cancel,

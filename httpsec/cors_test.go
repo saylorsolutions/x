@@ -2,6 +2,8 @@ package httpsec
 
 import (
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -36,7 +38,7 @@ func Test_AllowEndpointAccess(t *testing.T) {
 			),
 		),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	srv := httptest.NewServer(policies.Middleware(mux))
 	defer srv.Close()
 
@@ -124,7 +126,7 @@ func TestFallbackPolicy(t *testing.T) {
 			),
 		),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	srv := httptest.NewServer(policies.Middleware(mux))
 	defer srv.Close()
 
@@ -200,11 +202,12 @@ func TestValidateCORSPolicy(t *testing.T) {
 }
 
 func testPreflight(t *testing.T, url, origin string) (allowedOrigin, allowedMethods, allowedHeaders, allowCredentials string) {
+	t.Helper()
 	req, err := http.NewRequest(http.MethodOptions, url, nil)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	req.Header.Set(HeaderCORSOrigin, origin)
 	resp, err := http.DefaultClient.Do(req)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	allowedOrigin = resp.Header.Get(HeaderCORSAllowOrigin)
 	allowedMethods = resp.Header.Get(HeaderCORSAllowMethods)
 	allowedHeaders = resp.Header.Get(HeaderCORSAllowHeaders)

@@ -3,6 +3,8 @@ package cli
 import (
 	flag "github.com/spf13/pflag"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"io"
 	"testing"
 )
@@ -31,8 +33,8 @@ func TestAddGlobalPreExec(t *testing.T) {
 		return nil
 	})
 
-	assert.NoError(t, tlc.Exec([]string{"test"}))
+	require.NoError(t, tlc.Exec([]string{"test"}))
 	assert.Equal(t, 1, preExecRuns, "Pre-exec should be run once here")
-	assert.NoError(t, tlc.Exec([]string{"test", "two"}))
+	require.NoError(t, tlc.Exec([]string{"test", "two"}))
 	assert.Equal(t, 2, preExecRuns, "Pre-exec should be run again, and only before running 'two'")
 }

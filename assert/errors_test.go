@@ -2,9 +2,10 @@ package assert
 
 import (
 	"errors"
+	"testing"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestCollector_Unwrap(t *testing.T) {
@@ -15,10 +16,10 @@ func TestCollector_Unwrap(t *testing.T) {
 		as   = new(Collector)
 	)
 
-	require.NotNil(t, err)
-	assert.ErrorIs(t, err, ErrA)
-	assert.ErrorIs(t, err, ErrB)
-	assert.ErrorAs(t, err, &as)
+	require.Error(t, err)
+	require.ErrorIs(t, err, ErrA)
+	require.ErrorIs(t, err, ErrB)
+	require.ErrorAs(t, err, &as)
 }
 
 func TestCollector_Error(t *testing.T) {
@@ -27,6 +28,6 @@ func TestCollector_Error(t *testing.T) {
 		ErrB = errors.New("B")
 		err  = CollectErrors(" ").Add(ErrA).Add(ErrB).AddString("C").Result()
 	)
-	require.NotNil(t, err)
+	require.Error(t, err)
 	assert.Equal(t, "A B C", err.Error())
 }

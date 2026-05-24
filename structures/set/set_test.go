@@ -1,16 +1,17 @@
 package set
 
 import (
-	"github.com/stretchr/testify/assert"
 	"sort"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSet_Slice(t *testing.T) {
 	set := New[string]()
 	slice := set.Slice()
 	assert.Nil(t, slice)
-	assert.Len(t, slice, 0)
+	assert.Empty(t, slice)
 	set = New("a", "b")
 	set.Add("c", "d")
 	set.Remove("d", "e")

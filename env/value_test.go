@@ -1,14 +1,16 @@
 package env
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func tempSet(t *testing.T, key, val string) func() {
+	t.Helper()
 	curVal, isSet := os.LookupEnv(key)
 	assert.NoError(t, os.Setenv(key, val))
 	return func() {
@@ -235,7 +237,7 @@ func TestFloat(t *testing.T) {
 			if !tc.unset {
 				defer tempSet(t, key, tc.value)()
 			}
-			assert.Equal(t, tc.expected, Float(key, defaultVal))
+			assert.Equal(t, tc.expected, Float(key, defaultVal)) //nolint:testifylint // Looking for exact value from string.
 		})
 	}
 }

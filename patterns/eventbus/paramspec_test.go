@@ -1,8 +1,10 @@
 package eventbus
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestParamSpec(t *testing.T) {
@@ -29,9 +31,9 @@ func TestParamSpec(t *testing.T) {
 		Optional(AssertAndStore(&opt)),
 	)
 	errs := spec(params)
-	assert.Len(t, errs, 0)
+	assert.Empty(t, errs)
 	assert.Equal(t, "A", a)
-	assert.Equal(t, true, b)
+	assert.True(t, b)
 	assert.Equal(t, 3, c)
 	assert.Equal(t, 0, opt)
 }
@@ -45,7 +47,7 @@ func TestAnyPass(t *testing.T) {
 		AssertAndStore(&b),
 		AssertAndStore(&a),
 	)(1, "A value")
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 0, b)
 	assert.Equal(t, "A value", a)
 }

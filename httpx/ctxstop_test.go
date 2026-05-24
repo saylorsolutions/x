@@ -3,7 +3,10 @@ package httpx
 import (
 	"context"
 	"errors"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"sync/atomic"
 	"testing"
 	"time"
@@ -27,7 +30,7 @@ func TestListenCtx(t *testing.T) {
 		)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		assert.NoError(t, listenCtx(ctx, serveFn, shutdownFn, 500*time.Millisecond))
+		require.NoError(t, listenCtx(ctx, serveFn, shutdownFn, 500*time.Millisecond))
 		assert.True(t, serverListened.Load(), "Server listen function should have been called")
 		assert.True(t, serverShutdown.Load(), "Server shutdown function should have been called")
 	})
@@ -48,7 +51,7 @@ func TestListenCtx(t *testing.T) {
 		)
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
-		assert.ErrorIs(t, listenCtx(ctx, errListenFn, errShutdownFn, 500*time.Millisecond), errTestShutdown)
+		require.ErrorIs(t, listenCtx(ctx, errListenFn, errShutdownFn, 500*time.Millisecond), errTestShutdown)
 		assert.True(t, errServerListened.Load(), "Server listen function should have been called")
 		assert.False(t, errServerShutdown.Load(), "Server shutdown function should NOT have been called because the listener returns an error")
 	})

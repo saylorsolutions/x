@@ -2,7 +2,10 @@ package syncx
 
 import (
 	"context"
+
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
 	"testing"
 	"time"
 )
@@ -46,10 +49,10 @@ func TestFuture_Await_Blocking(t *testing.T) {
 		case 2:
 			val, err := f.AwaitErr(40 * time.Millisecond)
 			assert.Equal(t, 0, val)
-			assert.ErrorIs(t, err, context.DeadlineExceeded)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
 		}
 	}
 	val, err := f.AwaitErr()
 	assert.Equal(t, 5, val)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }

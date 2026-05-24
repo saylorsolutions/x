@@ -2,9 +2,11 @@ package contextx
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJointContext_Done(t *testing.T) {
@@ -13,27 +15,27 @@ func TestJointContext_Done(t *testing.T) {
 	aCancelled := Join(ctx, bg)
 	cancel()
 	assert.True(t, IsDone(aCancelled), "Joint context should have been cancelled")
-	assert.Error(t, aCancelled.Err())
+	require.Error(t, aCancelled.Err())
 
 	ctx, cancel = context.WithCancel(bg)
 	bCancelled := Join(bg, ctx)
 	cancel()
 	assert.True(t, IsDone(bCancelled), "Joint context should have been cancelled")
-	assert.Error(t, bCancelled.Err())
+	require.Error(t, bCancelled.Err())
 
 	ctx, cancel = context.WithCancel(bg)
 	asyncCancelled := Join(bg, ctx)
 	assert.False(t, IsDone(asyncCancelled), "Joint context should NOT have been cancelled")
-	assert.NoError(t, asyncCancelled.Err())
+	require.NoError(t, asyncCancelled.Err())
 	cancel()
 	assert.True(t, IsDone(asyncCancelled), "Joint context should have been cancelled")
-	assert.Error(t, ctx.Err())
+	require.Error(t, ctx.Err())
 
 	ctx, cancel = context.WithCancel(bg)
 	awaitCancelled := Join(bg, ctx)
 	doneCh := awaitCancelled.Done()
 	assert.False(t, IsDone(awaitCancelled), "Joint context should NOT have been cancelled")
-	assert.NoError(t, awaitCancelled.Err())
+	require.NoError(t, awaitCancelled.Err())
 	cancel()
 	select {
 	case <-time.After(time.Second):
@@ -42,13 +44,13 @@ func TestJointContext_Done(t *testing.T) {
 		t.Log("Monitor closed the channel")
 	}
 	assert.True(t, IsDone(awaitCancelled), "Joint context should have been cancelled")
-	assert.Error(t, ctx.Err())
-	assert.ErrorIs(t, awaitCancelled.Err(), context.Canceled)
+	require.Error(t, ctx.Err())
+	require.ErrorIs(t, awaitCancelled.Err(), context.Canceled)
 }
 
 func TestJointContext_Value(t *testing.T) {
 	bg := context.Background()
-	ctx := context.WithValue(bg, "key", "value")
+	ctx := context.WithValue(bg, "key", "value") //nolint:staticcheck // Using plain string as key for testing.
 	aValue := Join(ctx, bg)
 	assert.Equal(t, "value", aValue.Value("key"))
 
@@ -68,7 +70,8 @@ func TestJoin(t *testing.T) {
 func TestJointContext_Deadline(t *testing.T) {
 	bg := context.Background()
 	noDeadline := Join(bg, bg)
-	deadline, ok := noDeadline.Deadline()
+	var deadline time.Time
+	_, ok := noDeadline.Deadline()
 	assert.False(t, ok, "Should be no deadline reported")
 
 	ctx, cancel := context.WithTimeout(bg, 100*time.Millisecond)
@@ -88,8 +91,8 @@ func TestJointContext_Deadline(t *testing.T) {
 
 func TestJoinWithValuer(t *testing.T) {
 	bg := context.Background()
-	actx := context.WithValue(bg, "key", 5)
-	bctx := context.WithValue(bg, "key", 10)
+	actx := context.WithValue(bg, "key", 5)  //nolint:staticcheck // Using plain string as key for testing.
+	bctx := context.WithValue(bg, "key", 10) //nolint:staticcheck // Using plain string as key for testing.
 	noValuer := Join(actx, bctx)
 	val := noValuer.Value("key").(int)
 	assert.True(t, val == 5 || val == 10, "Value should be one of the context values")

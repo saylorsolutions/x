@@ -1,8 +1,9 @@
 package bidimap
 
 import (
-	"github.com/saylorsolutions/x/structures/set"
 	"sync"
+
+	"github.com/saylorsolutions/x/structures/set"
 )
 
 // MultiMap is a generic, many-to-many, bidirectional, concurrency safe map between key and value.
@@ -66,7 +67,7 @@ func (m *MultiMap[K, V]) GetValuesOk(key K) ([]V, bool) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	_set := m.ktov[key]
-	return _set.Slice(), _set != nil && len(_set) > 0
+	return _set.Slice(), len(_set) > 0
 }
 
 // GetValues will return a slice of values associated with the given key.
@@ -95,7 +96,7 @@ func (m *MultiMap[K, V]) GetKeysOk(value V) ([]K, bool) {
 	m.mux.Lock()
 	defer m.mux.Unlock()
 	_set := m.vtok[value]
-	return _set.Slice(), _set != nil && len(_set) > 0
+	return _set.Slice(), len(_set) > 0
 }
 
 // GetKeys will return a slice of keys associated with the given value.

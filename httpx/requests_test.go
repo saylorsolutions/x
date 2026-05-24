@@ -2,13 +2,14 @@ package httpx
 
 import (
 	"encoding/json"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestJSONType struct {
@@ -53,14 +54,14 @@ func TestRequest(t *testing.T) {
 		hasJSONData = false
 		resp, status, err := GetRequest(srv.URL+"/test").SetQueryParams("key", "value").Send()
 		require.NotNil(t, resp)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, 200, status)
 		assert.True(t, handledRequest, "Should have handled request")
 		assert.True(t, hasQueryParam, "Should have had the query parameter")
 		assert.False(t, hasFormParam, "Should not have had the form parameter")
 		assert.False(t, hasJSONData, "Should not have JSON data")
 		str, err := resp.String()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "all good!", str)
 	})
 
@@ -70,7 +71,7 @@ func TestRequest(t *testing.T) {
 		hasFormParam = false
 		hasJSONData = false
 		resp, status, err := PostRequest(srv.URL + "/test").Send()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, 200, status)
 		assert.True(t, handledRequest, "Should have handled request")
@@ -78,7 +79,7 @@ func TestRequest(t *testing.T) {
 		assert.False(t, hasFormParam, "Should not have had the form parameter")
 		assert.False(t, hasJSONData, "Should not have JSON data")
 		str, err := resp.String()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "all good!", str)
 	})
 
@@ -90,7 +91,7 @@ func TestRequest(t *testing.T) {
 		resp, status, err := PostFormRequest(srv.URL+"/test", map[string][]string{
 			"name": {"bob"},
 		}).Send()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, 200, status)
 		assert.True(t, handledRequest, "Should have handled request")
@@ -98,7 +99,7 @@ func TestRequest(t *testing.T) {
 		assert.True(t, hasFormParam, "Should have had the form parameter")
 		assert.False(t, hasJSONData, "Should not have JSON data")
 		str, err := resp.String()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "all good!", str)
 	})
 
@@ -108,7 +109,7 @@ func TestRequest(t *testing.T) {
 		hasFormParam = false
 		hasJSONData = false
 		resp, status, err := PutRequest(srv.URL + "/test").JSONBody(TestJSONType{Name: "bob"}).Send()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, 200, status)
 		assert.True(t, handledRequest, "Should have handled request")
@@ -116,7 +117,7 @@ func TestRequest(t *testing.T) {
 		assert.False(t, hasFormParam, "Should not have had the form parameter")
 		assert.True(t, hasJSONData, "Should have JSON data")
 		str, err := resp.String()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "all good!", str)
 	})
 
@@ -126,7 +127,7 @@ func TestRequest(t *testing.T) {
 		hasFormParam = false
 		hasJSONData = false
 		resp, status, err := PatchRequest(srv.URL + "/test").JSONBody(TestJSONType{Name: "bob"}).Send()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, 200, status)
 		assert.True(t, handledRequest, "Should have handled request")
@@ -134,7 +135,7 @@ func TestRequest(t *testing.T) {
 		assert.False(t, hasFormParam, "Should not have had the form parameter")
 		assert.True(t, hasJSONData, "Should have JSON data")
 		str, err := resp.String()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "all good!", str)
 	})
 
@@ -144,7 +145,7 @@ func TestRequest(t *testing.T) {
 		hasFormParam = false
 		hasJSONData = false
 		resp, status, err := DeleteRequest(srv.URL + "/test").Send()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		require.NotNil(t, resp)
 		assert.Equal(t, 200, status)
 		assert.True(t, handledRequest, "Should have handled request")
@@ -152,7 +153,7 @@ func TestRequest(t *testing.T) {
 		assert.False(t, hasFormParam, "Should not have had the form parameter")
 		assert.False(t, hasJSONData, "Should not have JSON data")
 		str, err := resp.String()
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		assert.Equal(t, "all good!", str)
 	})
 }
@@ -175,7 +176,7 @@ func TestReadJSON(t *testing.T) {
 		},
 	}
 	val, err := ReadJSON[map[string]any](resp)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, "bob", (*val)["name"].(string))
 	assert.True(t, body.closeCalled, "Close wasn't called on response body")
 }
@@ -212,8 +213,8 @@ func TestRequestAuth(t *testing.T) {
 		bearerAuth = false
 		resp, status, err := PostRequest(srv.URL+"/test").BasicAuth("jamesbaxter", "neigh").Send()
 		assert.Equal(t, 200, status)
-		assert.NoError(t, err)
-		assert.NoError(t, resp.Close())
+		require.NoError(t, err)
+		require.NoError(t, resp.Close())
 		assert.True(t, basicAuth, "Should have capture basic auth credentials")
 		assert.False(t, bearerAuth, "Should not have capture bearer auth credentials")
 	})
@@ -223,8 +224,8 @@ func TestRequestAuth(t *testing.T) {
 		bearerAuth = false
 		resp, status, err := PostRequest(srv.URL + "/test").BearerAuth("12345").Send()
 		assert.Equal(t, 200, status)
-		assert.NoError(t, err)
-		assert.NoError(t, resp.Close())
+		require.NoError(t, err)
+		require.NoError(t, resp.Close())
 		assert.False(t, basicAuth, "Should not have capture basic auth credentials")
 		assert.True(t, bearerAuth, "Should have capture bearer auth credentials")
 	})
@@ -234,21 +235,22 @@ func TestRequest_SetCookie(t *testing.T) {
 	mux := http.NewServeMux()
 	mux.HandleFunc("GET /cookie", func(w http.ResponseWriter, r *http.Request) {
 		cookies := r.Cookies()
-		require.Len(t, cookies, 1)
-		assert.Equal(t, "cookie value", cookies[0].Value)
-		assert.Equal(t, "TestCookie", cookies[0].Name)
+		if assert.Len(t, cookies, 1) {
+			assert.Equal(t, "cookie value", cookies[0].Value)
+			assert.Equal(t, "TestCookie", cookies[0].Name)
+		}
 	})
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
 
-	_, status, err := GetRequest(srv.URL + "/cookie").SetCookie(&http.Cookie{
+	_, status, err := GetRequest(srv.URL + "/cookie").SetCookie(&http.Cookie{ //nolint:gosec // Used for header testing.
 		Name:     "TestCookie",
 		Value:    "cookie value",
 		Path:     "/",
 		Secure:   true,
 		HttpOnly: true,
 	}).Send()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 200, status)
 }
 
@@ -269,6 +271,6 @@ func TestRequest_JSONBody(t *testing.T) {
 			"payload": "payload",
 		}).Send()
 	_ = resp.Close()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.Equal(t, 200, status)
 }

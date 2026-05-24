@@ -1,11 +1,12 @@
 package httpx
 
 import (
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDeferredResponseWriter_Commit(t *testing.T) {
@@ -67,11 +68,11 @@ func TestDeferredResponseWriter_Commit(t *testing.T) {
 	})
 	t.Run("Set cookie", func(t *testing.T) {
 		handler := func(w http.ResponseWriter, r *http.Request) {
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(w, &http.Cookie{ //nolint:gosec // Used for header testing.
 				Name:  "test-cookie",
 				Value: "cookie-value",
 			})
-			http.SetCookie(w, &http.Cookie{
+			http.SetCookie(w, &http.Cookie{ //nolint:gosec // Used for header testing.
 				Name:  "other-cookie",
 				Value: "cookie-value",
 			})
@@ -84,6 +85,7 @@ func TestDeferredResponseWriter_Commit(t *testing.T) {
 }
 
 func testUseWriter(t *testing.T, handler http.HandlerFunc) (int, []byte, http.Header) {
+	t.Helper()
 	wrapped := func(w http.ResponseWriter, r *http.Request) {
 		dw := NewDeferredWriter(w)
 		handler.ServeHTTP(dw, r)
@@ -95,6 +97,7 @@ func testUseWriter(t *testing.T, handler http.HandlerFunc) (int, []byte, http.He
 }
 
 func testWithoutWriter(t *testing.T, handler http.HandlerFunc) (int, []byte, http.Header) {
+	t.Helper()
 	mux := http.NewServeMux()
 	mux.Handle("/test", handler)
 	ts := httptest.NewServer(mux)

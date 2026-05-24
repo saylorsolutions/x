@@ -3,29 +3,31 @@ package retry
 import (
 	"context"
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestDo(t *testing.T) {
 	t.Run("Immediate failure", func(t *testing.T) {
 		err := Do(3, testFailingIterator)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, testErrIntentional)
-		assert.False(t, errors.Is(err, ErrMaxRetries), "Should not be a retry error")
+		require.Error(t, err)
+		require.ErrorIs(t, err, testErrIntentional)
+		require.NotErrorIs(t, err, ErrMaxRetries, "Should not be a retry error")
 	})
 	t.Run("Retry failure", func(t *testing.T) {
 		err := Do(3, testRetryableIterator)
-		assert.Error(t, err)
-		assert.ErrorIs(t, err, testErrIntentional)
-		assert.True(t, errors.Is(err, ErrMaxRetries), "Should be a retry error")
+		require.Error(t, err)
+		require.ErrorIs(t, err, testErrIntentional)
+		require.ErrorIs(t, err, ErrMaxRetries, "Should be a retry error")
 		assert.Contains(t, err.Error(), ErrMaxRetries.Error())
 		assert.Contains(t, err.Error(), testErrIntentional.Error())
 	})
 	t.Run("Successful attempt", func(t *testing.T) {
 		err := Do(3, testPassingIterator)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 	})
 }
 
@@ -45,36 +47,36 @@ func TestWithSettings(t *testing.T) {
 			t.Error("Should not have called the Iterator")
 			return false, nil
 		})
-		assert.ErrorIs(t, err, context.Canceled)
+		require.ErrorIs(t, err, context.Canceled)
 	})
 	t.Run("Should take more than 110ms to loop", func(t *testing.T) {
 		start := time.Now()
 		err := WithSettings(settings, testRetryableIterator)
 		dur := time.Since(start)
 		assert.Greater(t, dur, 110*time.Millisecond)
-		assert.ErrorIs(t, err, ErrMaxRetries)
+		require.ErrorIs(t, err, ErrMaxRetries)
 	})
 	t.Run("Invalid max tries", func(t *testing.T) {
 		settings := settings.Copy()
 		settings.MaxTries = 1
 		err := WithSettings(settings, testPassingIterator)
-		assert.ErrorIs(t, err, ErrInvalidSettings)
+		require.ErrorIs(t, err, ErrInvalidSettings)
 	})
 	t.Run("Invalid time between retries", func(t *testing.T) {
 		settings := settings.Copy()
 		settings.TimeBetweenRetries = -1
 		err := WithSettings(settings, testPassingIterator)
-		assert.ErrorIs(t, err, ErrInvalidSettings)
+		require.ErrorIs(t, err, ErrInvalidSettings)
 	})
 	t.Run("Invalid backoff factor", func(t *testing.T) {
 		settings := settings.Copy()
 		settings.BackoffFactor = 0.5
 		err := WithSettings(settings, testPassingIterator)
-		assert.ErrorIs(t, err, ErrInvalidSettings)
+		require.ErrorIs(t, err, ErrInvalidSettings)
 	})
 }
 
-var testErrIntentional = errors.New("intentional error")
+var testErrIntentional = errors.New("intentional error") //nolint:staticcheck // This error is just for testing.
 
 func testFailingIterator() (bool, error) {
 	return false, testErrIntentional

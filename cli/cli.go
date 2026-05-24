@@ -3,11 +3,12 @@ package cli
 import (
 	"errors"
 	"fmt"
-	flag "github.com/spf13/pflag"
 	"os"
 	"regexp"
 	"slices"
 	"strings"
+
+	flag "github.com/spf13/pflag"
 )
 
 var (
@@ -105,13 +106,13 @@ func (c *Command) Usage(format string, args ...any) *Command {
 			if !strings.HasSuffix(text, "\n") {
 				text += "\n"
 			}
-			buf.WriteString(fmt.Sprintf(`%s
+			_, _ = fmt.Fprintf(&buf, `%s
 
-%s`, c.shortUsage, text))
+%s`, c.shortUsage, text)
 		}
 		buf.WriteString("\nFLAGS\n")
 		buf.WriteString(c.flags.FlagUsages())
-		if len(c.CommandSet.commands) > 0 {
+		if len(c.commands) > 0 {
 			buf.WriteString("\nCOMMANDS\n")
 			buf.WriteString(c.CommandUsages())
 		}
@@ -293,7 +294,7 @@ func (s *CommandSet) CommandUsages() string {
 	}
 	fmtStr := fmt.Sprintf("  %%-%ds\t%%s\n", maxLen)
 	for i, cmd := range cmds {
-		buf.WriteString(fmt.Sprintf(fmtStr, withAliases[i], cmd.shortUsage))
+		_, _ = fmt.Fprintf(&buf, fmtStr, withAliases[i], cmd.shortUsage)
 	}
 	return buf.String()
 }

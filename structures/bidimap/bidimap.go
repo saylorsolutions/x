@@ -19,11 +19,11 @@ func New[K comparable, V comparable]() *BidiMap[K, V] {
 }
 
 func (m *BidiMap[K, V]) init() {
-	m.mux.Lock()
-	defer m.mux.Unlock()
 	if m == nil {
 		panic("nil BidiMap!")
 	}
+	m.mux.Lock()
+	defer m.mux.Unlock()
 	if m.ktov == nil {
 		m.ktov = map[K]V{}
 	}

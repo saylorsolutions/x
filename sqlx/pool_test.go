@@ -2,11 +2,12 @@ package sqlx
 
 import (
 	"context"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type mockConn struct {
@@ -32,15 +33,15 @@ func TestConnPool_Acquire_Exhausted(t *testing.T) {
 	require.NotNil(t, pool)
 
 	first, err := pool.Acquire()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, first)
-	assert.Equal(t, 1.0, pool.Stats().Utilization)
+	assert.Equal(t, 1.0, pool.Stats().Utilization) //nolint:testifylint // Known to be deterministic scale.
 
 	second, err := pool.Acquire()
-	assert.ErrorIs(t, err, ErrPoolExhausted)
+	require.ErrorIs(t, err, ErrPoolExhausted)
 	assert.Nil(t, second)
 
-	assert.NoError(t, pool.Close())
+	require.NoError(t, pool.Close())
 	assert.True(t, first.closed.Load())
 }
 
@@ -54,17 +55,17 @@ func TestConnPool_Return(t *testing.T) {
 	require.NotNil(t, pool)
 
 	conn, err := pool.Acquire()
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, conn)
 	assert.Equal(t, stateLeased, pool.conns[0].state)
-	assert.Equal(t, 1.0, pool.Stats().Utilization)
+	assert.Equal(t, 1.0, pool.Stats().Utilization) //nolint:testifylint // Known to be deterministic scale.
 	pool.Release(conn)
-	assert.Equal(t, 0.0, pool.Stats().Utilization)
+	assert.Equal(t, 0.0, pool.Stats().Utilization) //nolint:testifylint // Known to be deterministic scale.
 	assert.Equal(t, stateAvailable, pool.conns[0].state)
 	assert.True(t, pool.conns[0].idleDeadline.After(time.Now()))
 	time.Sleep(300 * time.Millisecond)
 	assert.True(t, conn.closed.Load())
-	assert.NoError(t, pool.Close())
+	require.NoError(t, pool.Close())
 }
 
 func TestNewConnectionPool_MinStarted(t *testing.T) {
@@ -73,7 +74,7 @@ func TestNewConnectionPool_MinStarted(t *testing.T) {
 		OptMinConnections(3),
 		OptEnableDebugLogging(),
 	)
-	assert.ErrorIs(t, err, ErrConfig)
+	require.ErrorIs(t, err, ErrConfig)
 	assert.Nil(t, pool)
 
 	pool, err = NewConnectionPool[*mockConn](context.TODO(), newMockConn, keepAliveMockConn, 3,
@@ -81,9 +82,9 @@ func TestNewConnectionPool_MinStarted(t *testing.T) {
 		OptMinConnections(3),
 		OptEnableDebugLogging(),
 	)
-	assert.NoError(t, err)
+	require.NoError(t, err)
 	assert.NotNil(t, pool)
 	assert.Len(t, pool.conns, 3)
 
-	assert.NoError(t, pool.Close())
+	require.NoError(t, pool.Close())
 }

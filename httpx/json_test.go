@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/stretchr/testify/assert"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type TestErrorType struct {
@@ -58,9 +60,9 @@ func TestHandleJSON(t *testing.T) {
 		requestHandled = false
 		recorder := httptest.NewRecorder()
 		goodBody, err := json.Marshal(TestRequestType{Word: "test"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req, err := http.NewRequest("GET", "/test", bytes.NewReader(goodBody))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		handler.ServeHTTP(recorder, req)
 
 		assert.False(t, serverError, "Should not be a server error")
@@ -68,7 +70,7 @@ func TestHandleJSON(t *testing.T) {
 		assert.False(t, errorHappened, "Unexpected error happened")
 		assert.True(t, requestHandled, "Request should have been handled")
 		assert.Equal(t, 200, recorder.Code)
-		assert.Equal(t, ContentTypeJSON, recorder.Header().Get(HeaderContentType))
+		assert.JSONEq(t, ContentTypeJSON, recorder.Header().Get(HeaderContentType))
 	})
 
 	t.Run("Server error", func(t *testing.T) {
@@ -78,9 +80,9 @@ func TestHandleJSON(t *testing.T) {
 		requestHandled = false
 		recorder := httptest.NewRecorder()
 		errBody, err := json.Marshal(TestRequestType{Word: "error"})
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		req, err := http.NewRequest("GET", "/test", bytes.NewReader(errBody))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		handler.ServeHTTP(recorder, req)
 
 		assert.True(t, serverError, "Should be a server error")
@@ -88,7 +90,7 @@ func TestHandleJSON(t *testing.T) {
 		assert.True(t, errorHappened, "An error should have been returned")
 		assert.True(t, requestHandled, "Request should have been handled")
 		assert.Equal(t, 500, recorder.Code)
-		assert.Equal(t, ContentTypeJSON, recorder.Header().Get(HeaderContentType))
+		assert.JSONEq(t, ContentTypeJSON, recorder.Header().Get(HeaderContentType))
 	})
 
 	t.Run("Client error", func(t *testing.T) {
@@ -99,7 +101,7 @@ func TestHandleJSON(t *testing.T) {
 		recorder := httptest.NewRecorder()
 		notJSON := []byte("this is a string, not JSON!")
 		req, err := http.NewRequest("GET", "/test", bytes.NewReader(notJSON))
-		assert.NoError(t, err)
+		require.NoError(t, err)
 		handler.ServeHTTP(recorder, req)
 
 		assert.False(t, serverError, "Should not be a server error")
@@ -107,6 +109,6 @@ func TestHandleJSON(t *testing.T) {
 		assert.True(t, errorHappened, "An error should have been returned")
 		assert.False(t, requestHandled, "Request should have been caught by HandleJSON")
 		assert.Equal(t, 400, recorder.Code)
-		assert.Equal(t, ContentTypeJSON, recorder.Header().Get(HeaderContentType))
+		assert.JSONEq(t, ContentTypeJSON, recorder.Header().Get(HeaderContentType))
 	})
 }
