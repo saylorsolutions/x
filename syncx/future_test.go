@@ -40,7 +40,7 @@ func TestFuture_Await_Blocking(t *testing.T) {
 	)
 
 	go process(f)
-	for i := 0; i < 3; i++ {
+	for i := range 3 {
 		switch i {
 		case 0:
 			fallthrough

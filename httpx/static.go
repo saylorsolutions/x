@@ -74,10 +74,10 @@ func EmbeddedHandler(fs embed.FS, trimPrefix string, appendPrefix string) http.H
 		f, err := fs.Open(searchPath)
 		if err != nil {
 			if errors.Is(err, os.ErrNotExist) {
-				w.WriteHeader(404)
+				w.WriteHeader(http.StatusNotFound)
 				return
 			}
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
 		defer func() {

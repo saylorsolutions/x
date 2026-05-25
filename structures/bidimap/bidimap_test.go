@@ -34,7 +34,7 @@ func TestBidiMap_Concurrency(t *testing.T) {
 	var wg sync.WaitGroup
 	wg.Add(len(keys))
 
-	for i := 0; i < len(keys); i++ {
+	for i := range len(keys) {
 		go func(index int) {
 			m.Add(keys[index], values[index])
 			go func() {

@@ -103,7 +103,7 @@ func testWithoutWriter(t *testing.T, handler http.HandlerFunc) (int, []byte, htt
 	ts := httptest.NewServer(mux)
 	defer ts.Close()
 
-	resp, err := http.Get(ts.URL + "/test")
+	resp, err := http.Get(ts.URL + "/test") //nolint:noctx // This is fine for testing.
 	if err != nil {
 		t.Error("Failed to get server response:", err)
 	}

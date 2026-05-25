@@ -3,15 +3,14 @@ package slogx
 import (
 	"context"
 	"log/slog"
+	"maps"
 )
 
 type attrSet map[string]bool
 
 func (s attrSet) dupe() attrSet {
 	dupe := attrSet{}
-	for k, v := range s {
-		dupe[k] = v
-	}
+	maps.Copy(dupe, s)
 	return dupe
 }
 

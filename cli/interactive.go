@@ -20,6 +20,7 @@ const (
 var (
 	InteractiveFlag         = "-i"                  // InteractiveFlag specifies the flag that the user should pass to trigger [CommandSet.RespondInteractive].
 	InteractiveQuitCommands = []string{"quit", "x"} // InteractiveQuitCommands is a slice of strings that should escape from interactive mode.
+	InteractiveTimeout      = 10 * time.Minute      // InteractiveTimeout is the length of time a command is allowed to run in interactive mode.
 )
 
 // RespondInteractive will launch an interactive "shell" version of the [CommandSet] if the [InteractiveFlag] is the first argument, indicating that the user is requesting interactive mode.
@@ -114,7 +115,7 @@ Use the '%s' command with one or more sub-commands to push them to the execution
 				continue
 			}
 			err := func() error {
-				timeout, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				timeout, cancel := context.WithTimeout(context.Background(), InteractiveTimeout)
 				defer cancel()
 				cmd := exec.CommandContext(timeout, command, segments...) //nolint:gosec // This is validated rather than trusting spoofable os.Args[0]
 				cmd.Stdout = p.out

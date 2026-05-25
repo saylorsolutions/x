@@ -10,7 +10,7 @@ import (
 func getEnv() map[string]string {
 	envMap := map[string]string{}
 	environ := os.Environ()
-	for i := 0; i < len(environ); i++ {
+	for i := range len(environ) {
 		key, val, found := strings.Cut(environ[i], "=")
 		if !found {
 			continue
@@ -84,12 +84,12 @@ func AsBool(sval string) (bool, bool) {
 }
 
 func asBool(sval string, truthy []string, falsy []string) (bool, bool) {
-	for i := 0; i < len(truthy); i++ {
+	for i := range len(truthy) {
 		if sval == strings.ToLower(truthy[i]) {
 			return true, true
 		}
 	}
-	for i := 0; i < len(falsy); i++ {
+	for i := range len(falsy) {
 		if sval == strings.ToLower(falsy[i]) {
 			return false, true
 		}
@@ -174,7 +174,7 @@ func InterpretSlice[T any](key string, delimiter string, defaultVal T, terp func
 	}
 	elements := strings.Split(sval, delimiter)
 	slice := make([]T, len(elements))
-	for i := 0; i < len(elements); i++ {
+	for i := range len(elements) {
 		eval, ok := terp(strings.TrimSpace(elements[i]))
 		if !ok {
 			slice[i] = defaultVal

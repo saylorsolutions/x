@@ -3,7 +3,7 @@ package eventbus
 import (
 	"context"
 	"errors"
-	"fmt"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -117,8 +117,8 @@ func TestEventBus_Dispatch_Async(t *testing.T) {
 		t.Errorf("Should not have received an error: %v", err)
 	})
 
-	for i := 0; i < 3; i++ {
-		bus.Dispatch(testEvent, fmt.Sprintf("%d", i))
+	for i := range 3 {
+		bus.Dispatch(testEvent, strconv.Itoa(i))
 	}
 	bus.AwaitStop(testShutdownTimeout)
 	assert.Equal(t, int32(3), counter.Load())
@@ -143,8 +143,8 @@ func TestEventBus_Stop(t *testing.T) {
 	bus.Register("stopping-handler", testEvent, handler)
 	bus.Start(context.Background())
 
-	for i := 0; i < 3; i++ {
-		bus.Dispatch(testEvent, fmt.Sprintf("%d", i))
+	for i := range 3 {
+		bus.Dispatch(testEvent, strconv.Itoa(i))
 	}
 	bus.AwaitStop(testShutdownTimeout)
 	assert.Equal(t, 3, handler.count)
@@ -177,14 +177,12 @@ func TestEventBus_Dispatch_HighVolume(t *testing.T) {
 		handled++
 		return nil
 	})
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	bus.Start(ctx)
+	bus.Start(t.Context())
 
 	var (
 		start = time.Now()
 	)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		go func() {
 			defer wg.Done()
 			bus.Dispatch(FirstEvent)

@@ -7,8 +7,7 @@ import (
 func main() {
 	b := NewBuild()
 	b.LintLatest().
-		Enable("testifylint", "thelper", "testableexamples").
+		Enable("testifylint", "thelper", "testableexamples", "perfsprint", "nolintlint", "noctx", "modernize", "mnd", "godox", "gocyclo", "gocritic").
 		EnableSecurityScanning()
-
 	b.Execute()
 }

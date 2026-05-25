@@ -11,7 +11,7 @@ var (
 )
 
 // LineEnding is used to specify a particular line ending for IndentWriter.
-// If no LineEnding is specified, then EndingLF is used.
+// If no LineEnding is specified or is unrecognized, then EndingLF is used.
 type LineEnding int
 
 const (
@@ -24,11 +24,11 @@ func (le LineEnding) ending() []byte {
 	switch le {
 	case EndingCRLF:
 		return crlf
-	default:
-		fallthrough
 	case EndingDefault:
 		fallthrough
 	case EndingLF:
+		fallthrough
+	default:
 		return lf
 	}
 }

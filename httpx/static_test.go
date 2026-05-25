@@ -2,7 +2,6 @@ package httpx
 
 import (
 	"embed"
-	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -25,7 +24,7 @@ func TestEmbeddedHandler(t *testing.T) {
 	mux.Handle("GET /something/", EmbeddedHandler(staticAssets, "/something", "/static"))
 	srv := httptest.NewServer(mux)
 	defer srv.Close()
-	resp, status, err := GetRequest(fmt.Sprintf("%s/something/test.svg", srv.URL)).Send()
+	resp, status, err := GetRequest(srv.URL + "/something/test.svg").Send()
 	require.NoError(t, err)
 	assert.Equal(t, 200, status)
 	assert.NotNil(t, resp)
@@ -38,7 +37,7 @@ func TestEmbeddedHandler(t *testing.T) {
 	assert.NotNil(t, data)
 	assert.Equal(t, expected, data)
 
-	_, status, err = GetRequest(fmt.Sprintf("%s/something/else.css", srv.URL)).Send()
+	_, status, err = GetRequest(srv.URL + "/something/else.css").Send()
 	require.NoError(t, err)
 	assert.Equal(t, 404, status)
 }

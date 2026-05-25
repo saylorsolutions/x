@@ -2,6 +2,7 @@ package httpx
 
 import (
 	"net/http"
+	"slices"
 )
 
 // Middleware is a function that wraps another [http.Handler] to inject logic before or after the handler is run.
@@ -16,7 +17,7 @@ func Wrap(next http.Handler, middlewares ...Middleware) http.Handler {
 		panic("nil handler")
 	}
 	// Wrapped in reverse order, so they're executed in parameter order.
-	for i := len(middlewares) - 1; i >= 0; i-- {
+	for i := range slices.Backward(middlewares) {
 		next = middlewares[i](next)
 	}
 	return next

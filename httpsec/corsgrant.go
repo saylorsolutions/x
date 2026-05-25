@@ -7,6 +7,10 @@ import (
 	"time"
 )
 
+const (
+	noPreflightResourceStatus = 404
+)
+
 func (c *corsConfig) grantAllowHeaders(w http.ResponseWriter, r *http.Request) {
 	policy, ok := c.endpointPolicies[r.URL.Path]
 	if !ok {
@@ -15,7 +19,7 @@ func (c *corsConfig) grantAllowHeaders(w http.ResponseWriter, r *http.Request) {
 				// No policy matches this endpoint
 				if r.Method == http.MethodOptions {
 					// If this is a preflight then inform the client that there is no resource here.
-					w.WriteHeader(404)
+					w.WriteHeader(noPreflightResourceStatus)
 				}
 				return
 			}

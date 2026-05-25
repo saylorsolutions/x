@@ -9,6 +9,10 @@ import (
 	"sync/atomic"
 )
 
+const (
+	callerStackFrame = 2
+)
+
 var disabled atomic.Bool
 
 // Disable will disable assertion evaluation globally.
@@ -24,7 +28,7 @@ func Enable() {
 }
 
 func getCallerDetails() string {
-	_, file, line, ok := runtime.Caller(2)
+	_, file, line, ok := runtime.Caller(callerStackFrame)
 	if !ok {
 		return "unknown"
 	}

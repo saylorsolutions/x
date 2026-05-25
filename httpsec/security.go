@@ -2,9 +2,11 @@ package httpsec
 
 import (
 	"fmt"
-	"github.com/saylorsolutions/x/httpx"
 	"net/http"
+	"slices"
 	"strings"
+
+	"github.com/saylorsolutions/x/httpx"
 )
 
 const (
@@ -46,7 +48,7 @@ func NewSecurityPolicies(opts ...SecurityOption) (*SecurityPolicies, error) {
 }
 
 func (s *SecurityPolicies) Middleware(next http.Handler) http.Handler {
-	for i := len(s.mw) - 1; i >= 0; i-- {
+	for i := range slices.Backward(s.mw) {
 		next = s.mw[i](next)
 	}
 	var reportingEndpoints string

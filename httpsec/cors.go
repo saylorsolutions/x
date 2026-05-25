@@ -19,8 +19,9 @@ const (
 	HeaderCORSAllowCreds   = "Access-Control-Allow-Credentials"
 	HeaderCORSMaxAge       = "Access-Control-Max-Age"
 
-	CORSAnyOrigin  = "*"
-	CORSNullOrigin = "null"
+	CORSAnyOrigin     = "*"
+	CORSNullOrigin    = "null"
+	DefaultCorsMaxAge = 86400 * time.Second
 )
 
 var (
@@ -43,7 +44,7 @@ func NewPolicy() *CORSPolicy {
 		allowedMethods: stringSet{},
 		allowedHeaders: stringSet{},
 		allowedOrigins: stringSet{},
-		maxAge:         86400 * time.Second, // Default to 24 hours.
+		maxAge:         DefaultCorsMaxAge, // Default to 24 hours.
 	}
 }
 

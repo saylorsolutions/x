@@ -4,13 +4,20 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/saylorsolutions/x/env"
-	"github.com/saylorsolutions/x/iterx"
-	"github.com/saylorsolutions/x/syncx"
 	"io"
 	"log"
 	"sync"
 	"time"
+
+	"github.com/saylorsolutions/x/env"
+	"github.com/saylorsolutions/x/iterx"
+	"github.com/saylorsolutions/x/syncx"
+)
+
+const (
+	DefaultIdleTimeout       = 2 * time.Minute // DefaultIdleTimeout is the default timeout to use to close a Connection when no transfer has been made.
+	DefaultAcquireTimeout    = 5 * time.Second // DefaultAcquireTimeout is the default timeout used to acquire a free Connection.
+	DefaultKeepaliveInterval = 3 * time.Second // DefaultKeepaliveInterval is the default interval that TCP keepalive packets are sent.
 )
 
 var (
@@ -165,15 +172,14 @@ func NewConnectionPool[T Connection](ctx context.Context, factory ConnectionFact
 	}
 	var cancel context.CancelFunc
 	ctx, cancel = context.WithCancel(ctx)
-	defaultIdle := 2 * time.Minute
 	conf := &poolConf{
 		ctx:               ctx,
 		cancel:            cancel,
 		maxConns:          maxPoolDepth,
-		acquireTimeout:    5 * time.Second,
-		idleTimeout:       defaultIdle,
-		idleCheckInterval: defaultIdle,
-		keepAliveInterval: 3 * time.Second,
+		acquireTimeout:    DefaultAcquireTimeout,
+		idleTimeout:       DefaultIdleTimeout,
+		idleCheckInterval: DefaultIdleTimeout,
+		keepAliveInterval: DefaultKeepaliveInterval,
 		debugLogging:      env.Bool("SQLX_POOLDEBUG", false),
 	}
 	for _, opt := range opts {
@@ -190,9 +196,8 @@ func NewConnectionPool[T Connection](ctx context.Context, factory ConnectionFact
 		factory:   factory,
 		keepAlive: keepAlive,
 	}
-	pool.doneMonitoring.Add(2)
-	go pool.idleMonitor()
-	go pool.keepAliveLoop()
+	pool.doneMonitoring.Go(pool.idleMonitor)
+	pool.doneMonitoring.Go(pool.keepAliveLoop)
 	for i := 0; i < conf.minConns; i++ {
 		conn, err := factory()
 		if err != nil {
@@ -207,7 +212,6 @@ func NewConnectionPool[T Connection](ctx context.Context, factory ConnectionFact
 
 func (p *Pool[T]) idleMonitor() {
 	const debugLabel = "[idleMonitor]"
-	defer p.doneMonitoring.Done()
 	ticker := time.NewTicker(p.conf.idleCheckInterval)
 	defer func() {
 		ticker.Stop()
@@ -250,7 +254,6 @@ func (p *Pool[T]) idleMonitor() {
 
 func (p *Pool[T]) keepAliveLoop() {
 	const debugLabel = "[keepAliveLoop]"
-	defer p.doneMonitoring.Done()
 	ticker := time.NewTicker(p.conf.idleCheckInterval)
 	defer func() {
 		ticker.Stop()
@@ -285,7 +288,7 @@ func (p *Pool[T]) keepAliveLoop() {
 					// Recreate connections to get back up to the minimum.
 					toRecreate := p.conf.minConns - (numAvailable - len(toRecycle))
 					p.debug(debugLabel, "need to recreate connections to maintain minimum:", toRecreate)
-					for i := 0; i < toRecreate; i++ {
+					for range toRecreate {
 						newConn, err := p.acquireNew()
 						if err != nil {
 							p.debug(debugLabel, "unable to recreate connection from factory:", err)

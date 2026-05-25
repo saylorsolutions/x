@@ -49,7 +49,7 @@ func (d *DeferredWriter) Commit() error {
 			d.cached.Header().Add(key, val)
 		}
 	}
-	if d.latestStatus != 200 {
+	if d.latestStatus != http.StatusOK {
 		d.cached.WriteHeader(d.latestStatus)
 	}
 	_, err := d.cached.Write(d.resp.Bytes())

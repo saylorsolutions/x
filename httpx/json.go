@@ -38,7 +38,7 @@ func HandleJSON[T any, R any, E any](errHandler JSONErrorHandler[E], handler JSO
 		var request T
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			errVal := errHandler(fmt.Errorf("%w: %v", ErrClientError, err))
-			w.WriteHeader(400)
+			w.WriteHeader(http.StatusBadRequest)
 			w.Header().Set(HeaderContentType, ContentTypeJSON)
 			_ = json.NewEncoder(w).Encode(errVal)
 			return
@@ -46,7 +46,7 @@ func HandleJSON[T any, R any, E any](errHandler JSONErrorHandler[E], handler JSO
 		resp, err := handler(&request)
 		if err != nil {
 			errVal := errHandler(fmt.Errorf("%w: %v", ErrServerError, err))
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set(HeaderContentType, ContentTypeJSON)
 			_ = json.NewEncoder(w).Encode(errVal)
 			return
@@ -54,7 +54,7 @@ func HandleJSON[T any, R any, E any](errHandler JSONErrorHandler[E], handler JSO
 		out, err := json.Marshal(resp)
 		if err != nil {
 			errVal := errHandler(fmt.Errorf("%w: %v", ErrServerError, err))
-			w.WriteHeader(500)
+			w.WriteHeader(http.StatusInternalServerError)
 			w.Header().Set(HeaderContentType, ContentTypeJSON)
 			_ = json.NewEncoder(w).Encode(errVal)
 			return

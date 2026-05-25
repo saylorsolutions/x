@@ -1,9 +1,10 @@
 package iterx
 
 import (
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDedupe(t *testing.T) {
@@ -60,7 +61,7 @@ func TestTransformSlice(t *testing.T) {
 	initial := []int{1, 2, 3}
 	expected := []string{"1", "2", "3"}
 	assert.Equal(t, initial, Select(initial).Slice())
-	assert.Equal(t, expected, TransformSlice(Select(initial), func(in int) string {
+	assert.Equal(t, expected, TransformSlice(Select(initial), func(in int) string { //nolint:gocritic
 		return strconv.Itoa(in)
 	}).Slice())
 }

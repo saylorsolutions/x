@@ -182,7 +182,6 @@ func TestValidateCORSPolicy(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			policy := NewPolicy()
 			if len(tc.Origin) > 0 {
@@ -203,7 +202,7 @@ func TestValidateCORSPolicy(t *testing.T) {
 
 func testPreflight(t *testing.T, url, origin string) (allowedOrigin, allowedMethods, allowedHeaders, allowCredentials string) {
 	t.Helper()
-	req, err := http.NewRequest(http.MethodOptions, url, nil)
+	req, err := http.NewRequestWithContext(t.Context(), http.MethodOptions, url, nil)
 	require.NoError(t, err)
 	req.Header.Set(HeaderCORSOrigin, origin)
 	resp, err := http.DefaultClient.Do(req)

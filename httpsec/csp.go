@@ -45,7 +45,7 @@ func CSPReportHandler(handler func(report CSPReport)) http.Handler {
 		}()
 		var report cspReportWrapper
 		if err := json.NewDecoder(r.Body).Decode(&report); err != nil {
-			http.Error(w, "Failed to parse CSP report", 500)
+			http.Error(w, "Failed to parse CSP report", http.StatusInternalServerError)
 			return
 		}
 		handler(report.Report)
@@ -221,7 +221,7 @@ func validateCSPSourceList(list []string) error {
 			continue
 		default:
 			withProtocol := elem
-			if !strings.HasPrefix("http", elem) {
+			if !strings.HasPrefix(elem, "http") {
 				u, _ := url.Parse(elem)
 				if len(u.Scheme) != 0 {
 					// In this case there should be an invalid protocol specified.

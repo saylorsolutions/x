@@ -76,7 +76,6 @@ func TestEnableContentSecurityPolicy(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			called := false
 			mux := http.NewServeMux()
@@ -89,7 +88,7 @@ func TestEnableContentSecurityPolicy(t *testing.T) {
 			srv := httptest.NewServer(sec.Middleware(mux))
 			defer srv.Close()
 
-			resp, err := http.Get(srv.URL)
+			resp, err := http.Get(srv.URL) //nolint:noctx // This is fine for testing.
 			require.NoError(t, err)
 			defer func() {
 				_ = resp.Body.Close()
@@ -128,7 +127,6 @@ func TestEnableContentSecurityPolicy_Neg(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			_, err := NewSecurityPolicies(EnableContentSecurityPolicy(tc))
 			require.Error(t, err)
@@ -162,7 +160,7 @@ func TestCSPReportHandler(t *testing.T) {
 		"csp-report": givenReport,
 	})
 	require.NoError(t, err)
-	resp, err := http.Post(srv.URL, CSPReportContentType, bytes.NewReader(body))
+	resp, err := http.Post(srv.URL, CSPReportContentType, bytes.NewReader(body)) //nolint:noctx // This is fine for testing.
 	require.NoError(t, err)
 	defer func() {
 		_ = resp.Body.Close()

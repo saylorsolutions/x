@@ -1,8 +1,9 @@
 package assert_test
 
 import (
-	"github.com/saylorsolutions/x/assert"
 	"testing"
+
+	"github.com/saylorsolutions/x/assert"
 )
 
 func TestNotEmpty(t *testing.T) {
@@ -18,7 +19,6 @@ func TestNotEmpty(t *testing.T) {
 		"Empty map":    mapp,
 	}
 	for name, val := range tests {
-		val := val
 		t.Run(name, func(t *testing.T) {
 			defer func() {
 				if r := recover(); r != nil {

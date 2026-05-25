@@ -1,5 +1,7 @@
 package set
 
+import "slices"
+
 // Set formalizes set semantics for a
 type Set[T comparable] map[T]struct{}
 
@@ -71,12 +73,9 @@ func (s Set[T]) HasAny(values ...T) bool {
 	if len(s) == 0 {
 		return false
 	}
-	for _, value := range values {
-		if s.Has(value) {
-			return true
-		}
-	}
-	return false
+	return slices.ContainsFunc(values, func(value T) bool {
+		return s.Has(value)
+	})
 }
 
 // HasAll determines if all given values are present in the [Set].

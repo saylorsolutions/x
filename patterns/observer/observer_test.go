@@ -1,17 +1,15 @@
 package observer
 
 import (
-	"context"
-	"github.com/stretchr/testify/assert"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSubject_Set(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	sub := NewSubject(ctx, 5)
+	sub := NewSubject(t.Context(), 5)
 	assert.Equal(t, 5, sub.Get())
 	sub.Set(10)
 	time.Sleep(50 * time.Millisecond)
@@ -19,9 +17,7 @@ func TestSubject_Set(t *testing.T) {
 }
 
 func TestSubject_Observe(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	sub := NewSubject(ctx, 5)
+	sub := NewSubject(t.Context(), 5)
 	assert.Equal(t, 5, sub.Get())
 
 	var (

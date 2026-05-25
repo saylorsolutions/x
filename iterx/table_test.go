@@ -2,9 +2,10 @@ package iterx
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"strconv"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTableMetadata_FilterColumns(t *testing.T) {
@@ -30,7 +31,6 @@ func TestTableMetadata_FilterColumns(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			result := SelectTable(table).SkipColumns(tc.excluded).Table()
 			assert.Equal(t, tc.expected, result)
@@ -63,7 +63,6 @@ func TestTableMetadata_FilterRows(t *testing.T) {
 	}
 
 	for name, tc := range tests {
-		tc := tc
 		t.Run(name, func(t *testing.T) {
 			filtered := SelectTable(table).FilterRows(SkipRows[int](tc.excluded))
 			result := filtered.Table()
@@ -303,9 +302,9 @@ func TestJoinTable(t *testing.T) {
 
 func TestTable_OffsetLimit(t *testing.T) {
 	table := make([][]int, 1000)
-	for i := 0; i < 1000; i++ {
+	for i := range 1000 {
 		table[i] = make([]int, 3)
-		for j := 0; j < 3; j++ {
+		for j := range 3 {
 			table[i][j] = j + i*3
 		}
 	}

@@ -3,11 +3,12 @@ package queue
 import (
 	"context"
 	"fmt"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestNewChannelQueue(t *testing.T) {
@@ -24,7 +25,7 @@ func TestNewChannelQueue(t *testing.T) {
 	)
 	wg.Add(10)
 
-	for i := 0; i < 10; i++ {
+	for i := range 10 {
 		expected += i + 1
 		go func() {
 			defer wg.Done()
