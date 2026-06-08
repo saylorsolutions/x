@@ -1,8 +1,9 @@
 package iterx
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestInvertMap(t *testing.T) {
@@ -49,7 +50,11 @@ func TestSliceSet(t *testing.T) {
 		4: true,
 		5: true,
 	}
-	assert.Equal(t, expected, SliceSet(initial).Map())
+	sliceSet := SliceSet(initial)
+	assert.True(t, sliceSet.NotEmpty())
+	assert.False(t, sliceSet.Empty())
+	result := sliceSet.Map()
+	assert.Equal(t, expected, result)
 }
 
 func TestMapIter_FilterKeysValues(t *testing.T) {

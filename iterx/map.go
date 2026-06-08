@@ -226,6 +226,16 @@ func (i MapIter[K, V]) First() (firstKey K, firstVal V, found bool) {
 	return
 }
 
+func (i MapIter[K, V]) Empty() bool {
+	_, _, exists := i.First()
+	return !exists
+}
+
+func (i MapIter[K, V]) NotEmpty() bool {
+	_, _, exists := i.First()
+	return exists
+}
+
 func (i MapIter[K, V]) Last() (lastKey K, lastVal V, found bool) {
 	i(func(key K, val V) bool {
 		lastKey, lastVal, found = key, val, true

@@ -153,6 +153,16 @@ func (i SliceIter[T]) First() (first T, found bool) {
 	return
 }
 
+func (i SliceIter[T]) Empty() bool {
+	_, exists := i.First()
+	return !exists
+}
+
+func (i SliceIter[T]) NotEmpty() bool {
+	_, exists := i.First()
+	return exists
+}
+
 func (i SliceIter[T]) Last() (last T, found bool) {
 	i(func(val T) bool {
 		last, found = val, true

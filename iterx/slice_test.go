@@ -33,6 +33,8 @@ func TestSliceIter_Append(t *testing.T) {
 	slice := SelectValue(5)
 	slice = slice.AppendValue(10)
 	slice = SelectValue(0).Append(slice)
+	assert.True(t, slice.NotEmpty())
+	assert.False(t, slice.Empty())
 	assert.Equal(t, []int{0, 5, 10}, slice.Slice())
 }
 
